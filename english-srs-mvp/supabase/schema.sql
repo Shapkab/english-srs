@@ -128,6 +128,7 @@ create table if not exists jobs (
   payload jsonb not null,
   status text not null default 'pending' check (status in ('pending','processing','done','failed')),
   attempts integer not null default 0,
+  last_error text,
   available_at timestamptz not null default now(),
   created_at timestamptz not null default now(),
   updated_at timestamptz not null default now()

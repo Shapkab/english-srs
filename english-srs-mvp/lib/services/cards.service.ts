@@ -27,7 +27,7 @@ export async function createCard(params: {
 
   if (error || !created) throw error ?? new Error('Failed to create card');
 
-  await supabase.from('srs_state').insert({
+  const { error: srsInsertError } = await supabase.from('srs_state').insert({
     card_id: created.id,
     user_id: params.userId,
     repetition: 0,
@@ -36,6 +36,7 @@ export async function createCard(params: {
     due_at: new Date().toISOString(),
     lapse_count: 0,
   });
+  if (srsInsertError) throw srsInsertError;
 
   return created;
 }
