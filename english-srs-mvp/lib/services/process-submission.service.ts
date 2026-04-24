@@ -98,11 +98,12 @@ export async function processSubmission(params: { submissionId: string; userId: 
     }
   }
 
-  await supabase
+  const { error: submissionUpdateError } = await supabase
     .from('submissions')
     .update({ status: 'analyzed' })
     .eq('id', submissionId)
     .eq('user_id', userId);
+  if (submissionUpdateError) throw submissionUpdateError;
 
   return {
     analysisId: analysisRow.id,

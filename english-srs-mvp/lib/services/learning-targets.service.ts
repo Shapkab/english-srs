@@ -9,18 +9,19 @@ export async function upsertLearningTarget(params: {
 }) {
   const supabase = getSupabaseAdmin();
 
-  const { data: existing } = await supabase
+  const { data: existing, error: existingError } = await supabase
     .from('learning_targets')
     .select('id, seen_count, active_card_count')
     .eq('user_id', params.userId)
     .eq('canonical_key', params.normalized.canonicalKey)
     .maybeSingle();
+  if (existingError) throw existingError;
 
   let learningTargetId: string;
 
   if (existing) {
     learningTargetId = existing.id;
-    await supabase
+    const { error: updateError } = await supabase
       .from('learning_targets')
       .update({
         last_seen_at: new Date().toISOString(),
@@ -28,6 +29,7 @@ export async function upsertLearningTarget(params: {
         explanation_short: params.normalized.explanationShort,
       })
       .eq('id', learningTargetId);
+    if (updateError) throw updateError;
   } else {
     const { data: created, error } = await supabase
       .from('learning_targets')
@@ -46,12 +48,13 @@ export async function upsertLearningTarget(params: {
     learningTargetId = created.id;
   }
 
-  await supabase.from('learning_target_evidence').insert({
+  const { error: evidenceInsertError } = await supabase.from('learning_target_evidence').insert({
     learning_target_id: learningTargetId,
     analysis_issue_id: params.issueId,
     submission_id: params.submissionId,
     user_id: params.userId,
   });
+  if (evidenceInsertError) throw evidenceInsertError;
 
   return { learningTargetId };
 }

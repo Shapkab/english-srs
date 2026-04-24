@@ -5,7 +5,7 @@ import { processSubmission } from '@/lib/services/process-submission.service';
 async function processOneJob() {
   const supabase = getSupabaseAdmin();
 
-  const { data: job } = await supabase
+  const { data: nextJob, error: nextJobError } = await supabase
     .from('jobs')
     .select('id, type, payload, attempts')
     .eq('status', 'pending')
@@ -13,13 +13,21 @@ async function processOneJob() {
     .order('created_at', { ascending: true })
     .limit(1)
     .maybeSingle();
+  if (nextJobError) throw nextJobError;
 
-  if (!job) return false;
+  if (!nextJob) return false;
 
-  await supabase
+  const { data: job, error: claimError } = await supabase
     .from('jobs')
-    .update({ status: 'processing', attempts: job.attempts + 1 })
-    .eq('id', job.id);
+    .update({ status: 'processing', attempts: nextJob.attempts + 1 })
+    .eq('id', nextJob.id)
+    .eq('status', 'pending')
+    .select('id, type, payload, attempts')
+    .maybeSingle();
+  if (claimError) throw claimError;
+
+  // Another worker claimed this job between select and update.
+  if (!job) return true;
 
   try {
     if (job.type !== 'analyze_submission') {
@@ -29,14 +37,16 @@ async function processOneJob() {
     const { submissionId, userId } = job.payload as { submissionId: string; userId: string };
     await processSubmission({ submissionId, userId });
 
-    await supabase.from('jobs').update({ status: 'done' }).eq('id', job.id);
+    const { error: doneError } = await supabase.from('jobs').update({ status: 'done' }).eq('id', job.id);
+    if (doneError) throw doneError;
     return true;
   } catch (error) {
     console.error('[worker] failed job', job.id, error);
-    await supabase
+    const { error: failedError } = await supabase
       .from('jobs')
       .update({ status: 'failed', last_error: error instanceof Error ? error.message : 'Unknown error' })
       .eq('id', job.id);
+    if (failedError) throw failedError;
     return true;
   }
 }

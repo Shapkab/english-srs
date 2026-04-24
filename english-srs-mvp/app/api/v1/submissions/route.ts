@@ -1,14 +1,12 @@
 import { NextResponse } from 'next/server';
 import { createSubmissionSchema } from '@/lib/validators/api';
-import { getSupabaseAdmin } from '@/lib/db/server';
-import { requireUserId } from '@/lib/auth/user';
+import { requireUserContext } from '@/lib/auth/user';
 import { trackEvent } from '@/lib/analytics/events';
 
 export async function POST(request: Request) {
   try {
-    const userId = await requireUserId();
+    const { userId, supabase } = await requireUserContext(request);
     const body = createSubmissionSchema.parse(await request.json());
-    const supabase = getSupabaseAdmin();
 
     const { data: submission, error } = await supabase
       .from('submissions')
@@ -22,11 +20,12 @@ export async function POST(request: Request) {
 
     if (error || !submission) throw error ?? new Error('Failed to create submission');
 
-    await supabase.from('jobs').insert({
+    const { error: jobInsertError } = await supabase.from('jobs').insert({
       type: 'analyze_submission',
       payload: { submissionId: submission.id, userId },
       status: 'pending',
     });
+    if (jobInsertError) throw jobInsertError;
 
     trackEvent('submission_created', { userId, submissionId: submission.id });
 
