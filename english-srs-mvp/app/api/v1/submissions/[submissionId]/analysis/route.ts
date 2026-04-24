@@ -1,33 +1,34 @@
 import { NextResponse } from 'next/server';
-import { getSupabaseAdmin } from '@/lib/db/server';
-import { requireUserId } from '@/lib/auth/user';
+import { requireUserContext } from '@/lib/auth/user';
 
-export async function GET(_: Request, context: { params: Promise<{ submissionId: string }> }) {
+export async function GET(request: Request, context: { params: Promise<{ submissionId: string }> }) {
   try {
-    const userId = await requireUserId();
+    const { userId, supabase } = await requireUserContext(request);
     const { submissionId } = await context.params;
-    const supabase = getSupabaseAdmin();
 
-    const { data: analysis } = await supabase
+    const { data: analysis, error: analysisError } = await supabase
       .from('analyses')
       .select('corrected_text, summary')
       .eq('submission_id', submissionId)
       .eq('user_id', userId)
       .maybeSingle();
+    if (analysisError) throw analysisError;
 
-    const { data: issues } = await supabase
+    const { data: issues, error: issuesError } = await supabase
       .from('analysis_issues')
       .select('id, category, error_text, corrected_text, explanation_short, confidence, should_create_card')
       .eq('submission_id', submissionId)
       .eq('user_id', userId)
       .order('created_at', { ascending: true });
+    if (issuesError) throw issuesError;
 
-    const { data: cards } = await supabase
+    const { data: cards, error: cardsError } = await supabase
       .from('cards')
       .select('id, front, back')
       .eq('source_submission_id', submissionId)
       .eq('user_id', userId)
       .order('created_at', { ascending: true });
+    if (cardsError) throw cardsError;
 
     return NextResponse.json({
       correctedText: analysis?.corrected_text ?? null,

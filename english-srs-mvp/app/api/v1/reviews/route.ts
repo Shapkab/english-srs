@@ -1,14 +1,12 @@
 import { NextResponse } from 'next/server';
 import { reviewSchema } from '@/lib/validators/api';
-import { getSupabaseAdmin } from '@/lib/db/server';
-import { requireUserId } from '@/lib/auth/user';
+import { requireUserContext } from '@/lib/auth/user';
 import { updateSrsState } from '@/lib/srs/update-srs';
 
 export async function POST(request: Request) {
   try {
-    const userId = await requireUserId();
+    const { userId, supabase } = await requireUserContext(request);
     const body = reviewSchema.parse(await request.json());
-    const supabase = getSupabaseAdmin();
 
     const { data: state, error: stateError } = await supabase
       .from('srs_state')
@@ -29,14 +27,15 @@ export async function POST(request: Request) {
       body.rating,
     );
 
-    await supabase.from('reviews').insert({
+    const { error: reviewInsertError } = await supabase.from('reviews').insert({
       card_id: body.cardId,
       user_id: userId,
       rating: body.rating,
       response_ms: body.responseMs ?? null,
     });
+    if (reviewInsertError) throw reviewInsertError;
 
-    await supabase
+    const { error: srsUpdateError } = await supabase
       .from('srs_state')
       .update({
         repetition: updated.repetition,
@@ -48,6 +47,7 @@ export async function POST(request: Request) {
       })
       .eq('card_id', body.cardId)
       .eq('user_id', userId);
+    if (srsUpdateError) throw srsUpdateError;
 
     return NextResponse.json({ ok: true, nextDueAt: updated.dueAt });
   } catch (error) {

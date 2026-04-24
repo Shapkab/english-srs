@@ -1,11 +1,23 @@
 import { NextResponse } from 'next/server';
-import { getSupabaseAdmin } from '@/lib/db/server';
-import { requireUserId } from '@/lib/auth/user';
+import { z } from 'zod';
+import { requireUserContext } from '@/lib/auth/user';
 
-export async function GET() {
+const relatedCardSchema = z.object({
+  id: z.string().uuid(),
+  card_type: z.string(),
+  front: z.string(),
+  hint: z.string().nullable(),
+  status: z.string(),
+});
+
+const reviewQueueRowSchema = z.object({
+  due_at: z.string(),
+  cards: z.union([relatedCardSchema, z.array(relatedCardSchema).max(1)]),
+});
+
+export async function GET(request: Request) {
   try {
-    const userId = await requireUserId();
-    const supabase = getSupabaseAdmin();
+    const { userId, supabase } = await requireUserContext(request);
 
     const now = new Date().toISOString();
     const { data, error } = await supabase
@@ -18,10 +30,15 @@ export async function GET() {
 
     if (error) throw error;
 
-    const cards = (data ?? [])
-      .filter((row) => row.cards && !Array.isArray(row.cards) && row.cards.status === 'active')
+    const parsedRows = z.array(reviewQueueRowSchema).parse(data ?? []);
+    const cards = parsedRows
+      .map((row) => ({
+        due_at: row.due_at,
+        card: Array.isArray(row.cards) ? row.cards[0] ?? null : row.cards,
+      }))
+      .filter((row) => row.card?.status === 'active')
       .map((row) => {
-        const card = row.cards as { id: string; card_type: string; front: string; hint: string | null; status: string };
+        const card = row.card!;
         return {
           cardId: card.id,
           cardType: card.card_type,

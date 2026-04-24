@@ -103,8 +103,11 @@ In another terminal:
 npm run worker:dev
 ```
 
-If you want to process a submission manually during local development, use:
+For local API development without Supabase Auth tokens, set `DEV_USER_ID` in `.env.local`.
+
+If you want to process a submission manually:
 
 ```bash
-curl -X POST http://localhost:3000/api/dev/process-submission/<submissionId>   -H "x-user-id: dev-user-1"
+curl -X POST http://localhost:3000/api/dev/process-submission/<submissionId> \
+  -H "Authorization: Bearer <supabase-access-token>"
 ```
