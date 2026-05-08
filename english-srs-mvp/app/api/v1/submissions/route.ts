@@ -2,6 +2,7 @@ import { NextResponse } from 'next/server';
 import { createSubmissionSchema } from '@/lib/validators/api';
 import { requireUserContext } from '@/lib/auth/user';
 import { trackEvent } from '@/lib/analytics/events';
+import { toErrorResponse } from '@/lib/http/errors';
 
 export async function POST(request: Request) {
   try {
@@ -31,6 +32,6 @@ export async function POST(request: Request) {
 
     return NextResponse.json({ submissionId: submission.id, status: submission.status }, { status: 201 });
   } catch (error) {
-    return NextResponse.json({ error: error instanceof Error ? error.message : 'Unknown error' }, { status: 400 });
+    return toErrorResponse(error);
   }
 }

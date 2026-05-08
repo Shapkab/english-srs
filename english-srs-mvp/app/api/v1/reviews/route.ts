@@ -2,6 +2,7 @@ import { NextResponse } from 'next/server';
 import { reviewSchema } from '@/lib/validators/api';
 import { requireUserContext } from '@/lib/auth/user';
 import { updateSrsState } from '@/lib/srs/update-srs';
+import { toErrorResponse } from '@/lib/http/errors';
 
 export async function POST(request: Request) {
   try {
@@ -51,6 +52,6 @@ export async function POST(request: Request) {
 
     return NextResponse.json({ ok: true, nextDueAt: updated.dueAt });
   } catch (error) {
-    return NextResponse.json({ error: error instanceof Error ? error.message : 'Unknown error' }, { status: 400 });
+    return toErrorResponse(error);
   }
 }
