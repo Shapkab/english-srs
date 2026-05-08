@@ -134,6 +134,13 @@ create table if not exists jobs (
   updated_at timestamptz not null default now()
 );
 
+-- jobs claim/retry columns (mirrors migrations/007_jobs_claim_columns.sql).
+alter table jobs add column if not exists claimed_at timestamptz;
+alter table jobs add column if not exists max_attempts integer not null default 3;
+create index if not exists idx_jobs_processing_claimed_at
+  on jobs (status, claimed_at)
+  where status = 'processing';
+
 create index if not exists idx_submissions_user_created on submissions(user_id, created_at desc);
 create index if not exists idx_jobs_status_available on jobs(status, available_at);
 create index if not exists idx_srs_state_user_due on srs_state(user_id, due_at);
