@@ -1,10 +1,14 @@
 import { getSupabaseAdmin } from '@/lib/db/server';
 import { analyzeSubmissionText } from '@/lib/services/analysis.service';
 import { normalizeIssueToLearningTarget } from '@/lib/normalization/normalize-issue';
-import { upsertLearningTarget } from '@/lib/services/learning-targets.service';
 import { generateCardCandidates } from '@/lib/services/card-generation.service';
-import { createCard } from '@/lib/services/cards.service';
-import type { AnalysisIssueDTO } from '@/lib/types/domain';
+import type { CardCandidate } from '@/lib/types/domain';
+
+interface PersistedRow {
+  analysis_id: string;
+  inserted_issue_ids: string[] | null;
+  created_card_ids: string[] | null;
+}
 
 export async function processSubmission(params: { submissionId: string; userId: string }) {
   const supabase = getSupabaseAdmin();
@@ -21,93 +25,57 @@ export async function processSubmission(params: { submissionId: string; userId: 
 
   const analysis = await analyzeSubmissionText(submission.original_text);
 
-  const { data: analysisRow, error: analysisInsertError } = await supabase
-    .from('analyses')
-    .insert({
-      submission_id: submissionId,
-      user_id: userId,
-      model: process.env.OPENAI_MODEL_ANALYSIS ?? 'gpt-4.1-mini',
-      corrected_text: analysis.correctedText,
-      summary: analysis.summary,
-      schema_version: '1.0.0',
-    })
-    .select('id')
-    .single();
+  const normalizedTargets = analysis.issues.map((issue) => normalizeIssueToLearningTarget(issue));
 
-  if (analysisInsertError || !analysisRow) throw analysisInsertError ?? new Error('Failed to create analysis row');
+  const selectedIssueIndices = analysis.issues
+    .map((issue, index) => ({ issue, index }))
+    .filter(({ issue }) => issue.shouldCreateCard && issue.confidence >= 0.8)
+    .sort(
+      (a, b) =>
+        b.issue.teachability + b.issue.severity - (a.issue.teachability + a.issue.severity),
+    )
+    .slice(0, 2)
+    .map(({ index }) => index);
 
-  const insertedIssues: Array<AnalysisIssueDTO & { id: string }> = [];
-  for (const issue of analysis.issues) {
-    const { data: issueRow, error: issueError } = await supabase
-      .from('analysis_issues')
-      .insert({
-        analysis_id: analysisRow.id,
-        submission_id: submissionId,
-        user_id: userId,
-        error_text: issue.errorText,
-        corrected_text: issue.correctedText,
-        category: issue.category,
-        subcategory: issue.subcategory,
-        explanation_short: issue.explanationShort,
-        confidence: issue.confidence,
-        severity: issue.severity,
-        teachability: issue.teachability,
-        should_create_card: issue.shouldCreateCard,
-      })
-      .select('id')
-      .single();
-
-    if (issueError || !issueRow) throw issueError ?? new Error('Failed to insert issue');
-    insertedIssues.push({ ...issue, id: issueRow.id });
-  }
-
-  const selectedIssues = insertedIssues
-    .filter((issue) => issue.shouldCreateCard && issue.confidence >= 0.8)
-    .sort((a, b) => (b.teachability + b.severity) - (a.teachability + a.severity))
-    .slice(0, 2);
-
-  const createdCardIds: string[] = [];
-
-  for (const issue of insertedIssues) {
-    const normalized = normalizeIssueToLearningTarget(issue);
-    const { learningTargetId } = await upsertLearningTarget({
-      userId,
-      normalized,
-      issueId: issue.id,
-      submissionId,
+  const cardCandidates: Array<{ issueIndex: number; candidate: CardCandidate }> = [];
+  for (const issueIndex of selectedIssueIndices) {
+    const normalized = normalizedTargets[issueIndex];
+    const candidates = await generateCardCandidates({
+      learningTargetTitle: normalized.displayTitle,
+      category: normalized.category,
+      explanationShort: normalized.explanationShort,
+      sourceSentence: analysis.correctedText,
     });
-
-    if (selectedIssues.some((selected) => selected.id === issue.id)) {
-      const candidates = await generateCardCandidates({
-        learningTargetTitle: normalized.displayTitle,
-        category: normalized.category,
-        explanationShort: normalized.explanationShort,
-        sourceSentence: analysis.correctedText,
-      });
-
-      const topCandidate = [...candidates].sort((a, b) => b.priority - a.priority)[0];
-      if (topCandidate) {
-        const createdCard = await createCard({
-          userId,
-          learningTargetId,
-          submissionId,
-          candidate: topCandidate,
-        });
-        createdCardIds.push(createdCard.id);
-      }
-    }
+    const top = [...candidates].sort((a, b) => b.priority - a.priority)[0];
+    if (top) cardCandidates.push({ issueIndex, candidate: top });
   }
 
-  const { error: submissionUpdateError } = await supabase
-    .from('submissions')
-    .update({ status: 'analyzed' })
-    .eq('id', submissionId)
-    .eq('user_id', userId);
-  if (submissionUpdateError) throw submissionUpdateError;
+  const rpcArgs = {
+    p_submission_id: submissionId,
+    p_user_id: userId,
+    p_model: process.env.OPENAI_MODEL_ANALYSIS ?? 'gpt-4.1-mini',
+    p_corrected_text: analysis.correctedText,
+    p_summary: analysis.summary,
+    p_schema_version: '1.0.0',
+    p_issues: analysis.issues,
+    p_normalized_targets: normalizedTargets,
+    p_card_candidates: cardCandidates,
+  };
+
+  const { data: persistResult, error: persistError } = await supabase.rpc(
+    'persist_submission_analysis',
+    rpcArgs as never,
+  );
+  if (persistError) throw persistError;
+
+  const row: PersistedRow | undefined = Array.isArray(persistResult)
+    ? (persistResult[0] as PersistedRow | undefined)
+    : (persistResult as PersistedRow | null) ?? undefined;
+  if (!row) throw new Error('persist_submission_analysis returned no row');
 
   return {
-    analysisId: analysisRow.id,
-    issueCount: insertedIssues.length,
-    createdCardIds,
+    analysisId: row.analysis_id,
+    issueCount: row.inserted_issue_ids?.length ?? 0,
+    createdCardIds: row.created_card_ids ?? [],
   };
 }
