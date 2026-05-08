@@ -1,3 +1,4 @@
+/* eslint-disable no-console */
 import { getOpenAIClient } from '@/lib/openai/client';
 import { CARD_GENERATION_SYSTEM_PROMPT, buildCardGenerationUserPrompt } from '@/lib/openai/prompts';
 import { cardCandidatesJsonSchema } from '@/lib/openai/schemas';
@@ -12,24 +13,53 @@ export async function generateCardCandidates(input: {
 }): Promise<CardCandidate[]> {
   const client = getOpenAIClient();
   const model = process.env.OPENAI_MODEL_CARD_GENERATION ?? 'gpt-4.1-mini';
+  const startedAt = Date.now();
 
-  const response = await client.responses.create({
-    model,
-    input: [
-      { role: 'system', content: CARD_GENERATION_SYSTEM_PROMPT },
-      { role: 'user', content: buildCardGenerationUserPrompt(input) },
-    ],
-    text: {
-      format: {
-        type: 'json_schema',
-        name: cardCandidatesJsonSchema.name,
-        strict: true,
-        schema: cardCandidatesJsonSchema.schema,
+  try {
+    const response = await client.responses.create({
+      model,
+      input: [
+        { role: 'system', content: CARD_GENERATION_SYSTEM_PROMPT },
+        { role: 'user', content: buildCardGenerationUserPrompt(input) },
+      ],
+      text: {
+        format: {
+          type: 'json_schema',
+          name: cardCandidatesJsonSchema.name,
+          strict: true,
+          schema: cardCandidatesJsonSchema.schema,
+        },
       },
-    },
-  });
+    });
 
-  const rawText = response.output_text;
-  const parsed = JSON.parse(rawText) as unknown;
-  return cardCandidatesSchema.parse(parsed).candidates;
+    console.error(
+      '[ai]',
+      JSON.stringify({
+        stage: 'card_generation',
+        model,
+        latencyMs: Date.now() - startedAt,
+        attemptCount: 1,
+        promptTokens: response.usage?.input_tokens,
+        completionTokens: response.usage?.output_tokens,
+      }),
+    );
+
+    const rawText = response.output_text;
+    const parsed = JSON.parse(rawText) as unknown;
+    return cardCandidatesSchema.parse(parsed).candidates;
+  } catch (error) {
+    const err = error as Error;
+    console.error(
+      '[ai]',
+      JSON.stringify({
+        stage: 'card_generation',
+        model,
+        latencyMs: Date.now() - startedAt,
+        attemptCount: 1,
+        error: err?.constructor?.name,
+        message: err?.message,
+      }),
+    );
+    throw error;
+  }
 }
