@@ -1,5 +1,6 @@
 import type { SupabaseClient } from '@supabase/supabase-js';
 import { getSupabaseUserClient } from '@/lib/db/server';
+import { HttpError } from '@/lib/http/errors';
 import type { Database } from '@/lib/types/database.generated';
 
 interface UserContext {
@@ -23,7 +24,7 @@ export async function requireUserContext(request: Request): Promise<UserContext>
     const supabase = getSupabaseUserClient(accessToken);
     const { data, error } = await supabase.auth.getUser(accessToken);
     if (error || !data.user) {
-      throw error ?? new Error('Unauthorized');
+      throw new HttpError(401, 'unauthorized');
     }
     return { userId: data.user.id, supabase };
   }
@@ -35,5 +36,5 @@ export async function requireUserContext(request: Request): Promise<UserContext>
     };
   }
 
-  throw new Error('Missing Authorization header. Use Bearer token auth.');
+  throw new HttpError(401, 'unauthorized');
 }

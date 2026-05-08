@@ -1,6 +1,7 @@
 import { NextResponse } from 'next/server';
 import { z } from 'zod';
 import { requireUserContext } from '@/lib/auth/user';
+import { toErrorResponse } from '@/lib/http/errors';
 
 const relatedCardSchema = z.object({
   id: z.string().uuid(),
@@ -50,6 +51,6 @@ export async function GET(request: Request) {
 
     return NextResponse.json({ cards });
   } catch (error) {
-    return NextResponse.json({ error: error instanceof Error ? error.message : 'Unknown error' }, { status: 400 });
+    return toErrorResponse(error);
   }
 }

@@ -1,6 +1,7 @@
 import { NextResponse } from 'next/server';
 import { feedbackSchema } from '@/lib/validators/api';
 import { requireUserContext } from '@/lib/auth/user';
+import { toErrorResponse } from '@/lib/http/errors';
 
 export async function POST(request: Request, context: { params: Promise<{ cardId: string }> }) {
   try {
@@ -27,6 +28,6 @@ export async function POST(request: Request, context: { params: Promise<{ cardId
 
     return NextResponse.json({ ok: true });
   } catch (error) {
-    return NextResponse.json({ error: error instanceof Error ? error.message : 'Unknown error' }, { status: 400 });
+    return toErrorResponse(error);
   }
 }
