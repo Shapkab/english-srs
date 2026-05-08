@@ -408,6 +408,7 @@ language plpgsql
 security definer
 set search_path = public, pg_temp
 as $$
+#variable_conflict use_column
 declare
   v_analysis_id uuid;
   v_owner_count int;
