@@ -354,3 +354,25 @@ create policy card_feedback_delete_own on card_feedback
 revoke all on jobs from anon, authenticated;
 alter table jobs enable row level security;
 alter table jobs force row level security;
+
+-- Auto-seed users_profile on auth.users insert (mirrors
+-- migrations/004_users_profile_trigger.sql).
+
+create or replace function public.handle_new_auth_user()
+returns trigger
+language plpgsql
+security definer
+set search_path = public, pg_temp
+as $$
+begin
+  insert into public.users_profile (id, email)
+  values (new.id, new.email)
+  on conflict (id) do nothing;
+  return new;
+end;
+$$;
+
+drop trigger if exists trg_handle_new_auth_user on auth.users;
+create trigger trg_handle_new_auth_user
+  after insert on auth.users
+  for each row execute procedure public.handle_new_auth_user();
