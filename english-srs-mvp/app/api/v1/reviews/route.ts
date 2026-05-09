@@ -28,29 +28,24 @@ export async function POST(request: Request) {
       body.rating,
     );
 
-    const { error: reviewInsertError } = await supabase.from('reviews').insert({
-      card_id: body.cardId,
-      user_id: userId,
-      rating: body.rating,
-      response_ms: body.responseMs ?? null,
-    });
-    if (reviewInsertError) throw reviewInsertError;
+    const { data: nextDueAt, error: rpcError } = await supabase.rpc(
+      'record_review',
+      {
+        p_card_id: body.cardId,
+        p_user_id: userId,
+        p_rating: body.rating,
+        p_response_ms: body.responseMs ?? null,
+        p_repetition: updated.repetition,
+        p_interval_days: updated.intervalDays,
+        p_ease_factor: updated.easeFactor,
+        p_lapse_count: updated.lapseCount,
+        p_due_at: updated.dueAt,
+        p_last_reviewed_at: updated.lastReviewedAt,
+      } as never,
+    );
+    if (rpcError) throw rpcError;
 
-    const { error: srsUpdateError } = await supabase
-      .from('srs_state')
-      .update({
-        repetition: updated.repetition,
-        interval_days: updated.intervalDays,
-        ease_factor: updated.easeFactor,
-        lapse_count: updated.lapseCount,
-        due_at: updated.dueAt,
-        last_reviewed_at: updated.lastReviewedAt,
-      })
-      .eq('card_id', body.cardId)
-      .eq('user_id', userId);
-    if (srsUpdateError) throw srsUpdateError;
-
-    return NextResponse.json({ ok: true, nextDueAt: updated.dueAt });
+    return NextResponse.json({ ok: true, nextDueAt });
   } catch (error) {
     return toErrorResponse(error);
   }
