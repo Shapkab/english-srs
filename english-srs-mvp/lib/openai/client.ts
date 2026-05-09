@@ -10,6 +10,6 @@ export function getOpenAIClient(): OpenAI {
     throw new Error('OPENAI_API_KEY is not set');
   }
 
-  client = new OpenAI({ apiKey });
+  client = new OpenAI({ apiKey, timeout: 30_000, maxRetries: 2 });
   return client;
 }
