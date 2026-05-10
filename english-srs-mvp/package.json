@@ -9,7 +9,7 @@
     "lint": "next lint",
     "typecheck": "tsc --noEmit",
     "test": "vitest run",
-    "db:types": "supabase gen types typescript --local > lib/types/database.generated.ts",
+    "db:types": "npx supabase gen types typescript --local > lib/types/database.generated.ts",
     "worker:dev": "tsx workers/process-jobs.ts"
   },
   "dependencies": {
