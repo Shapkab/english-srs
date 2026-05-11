@@ -20,7 +20,11 @@ export default function HomePage() {
 
       <div className="card">
         <h2>Next step</h2>
-        <p>Wire auth, run the SQL schema in Supabase, then start the job worker.</p>
+        <p>
+          Sign up via Supabase auth, then submit text through{' '}
+          <code>/api/v1/submissions</code>. A UI is being built in{' '}
+          <code>feat/frontend-mvp</code>.
+        </p>
       </div>
     </main>
   );
