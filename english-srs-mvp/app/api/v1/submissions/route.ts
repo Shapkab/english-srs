@@ -35,6 +35,6 @@ export async function POST(request: Request) {
 
     return NextResponse.json({ submissionId: submission.id, status: submission.status }, { status: 201 });
   } catch (error) {
-    return toErrorResponse(error);
+    return toErrorResponse(error, request);
   }
 }

@@ -15,6 +15,6 @@ export async function POST(request: Request, context: { params: Promise<{ submis
 
     return NextResponse.json({ ok: true, submissionId, ...result });
   } catch (error) {
-    return toErrorResponse(error);
+    return toErrorResponse(error, request);
   }
 }

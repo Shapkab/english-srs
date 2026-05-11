@@ -47,6 +47,6 @@ export async function POST(request: Request) {
 
     return NextResponse.json({ ok: true, nextDueAt });
   } catch (error) {
-    return toErrorResponse(error);
+    return toErrorResponse(error, request);
   }
 }

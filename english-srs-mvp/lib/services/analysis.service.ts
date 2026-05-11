@@ -1,8 +1,8 @@
-/* eslint-disable no-console */
 import { getOpenAIClient } from '@/lib/openai/client';
 import { ANALYSIS_SYSTEM_PROMPT, buildAnalysisUserPrompt } from '@/lib/openai/prompts';
 import { analysisJsonSchema } from '@/lib/openai/schemas';
 import { analysisResultSchema } from '@/lib/validators/api';
+import { log } from '@/lib/observability/log';
 import type { AnalysisResultDTO } from '@/lib/types/domain';
 
 export async function analyzeSubmissionText(text: string): Promise<AnalysisResultDTO> {
@@ -27,34 +27,28 @@ export async function analyzeSubmissionText(text: string): Promise<AnalysisResul
       },
     });
 
-    console.error(
-      '[ai]',
-      JSON.stringify({
-        stage: 'analysis',
-        model,
-        latencyMs: Date.now() - startedAt,
-        attemptCount: 1,
-        promptTokens: response.usage?.input_tokens,
-        completionTokens: response.usage?.output_tokens,
-      }),
-    );
+    log.info('ai_call', {
+      stage: 'analysis',
+      model,
+      latencyMs: Date.now() - startedAt,
+      attemptCount: 1,
+      promptTokens: response.usage?.input_tokens,
+      completionTokens: response.usage?.output_tokens,
+    });
 
     const rawText = response.output_text;
     const parsed = JSON.parse(rawText) as unknown;
     return analysisResultSchema.parse(parsed);
   } catch (error) {
     const err = error as Error;
-    console.error(
-      '[ai]',
-      JSON.stringify({
-        stage: 'analysis',
-        model,
-        latencyMs: Date.now() - startedAt,
-        attemptCount: 1,
-        error: err?.constructor?.name,
-        message: err?.message,
-      }),
-    );
+    log.error('ai_call_failed', {
+      stage: 'analysis',
+      model,
+      latencyMs: Date.now() - startedAt,
+      attemptCount: 1,
+      errorName: err?.constructor?.name,
+      message: err?.message,
+    });
     throw error;
   }
 }
