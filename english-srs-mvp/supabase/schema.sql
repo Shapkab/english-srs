@@ -154,14 +154,17 @@ begin
 end;
 $$ language plpgsql;
 
+drop trigger if exists trg_learning_targets_updated_at on learning_targets;
 create trigger trg_learning_targets_updated_at
 before update on learning_targets
 for each row execute procedure set_updated_at();
 
+drop trigger if exists trg_cards_updated_at on cards;
 create trigger trg_cards_updated_at
 before update on cards
 for each row execute procedure set_updated_at();
 
+drop trigger if exists trg_srs_state_updated_at on srs_state;
 create trigger trg_srs_state_updated_at
 before update on srs_state
 for each row execute procedure set_updated_at();
