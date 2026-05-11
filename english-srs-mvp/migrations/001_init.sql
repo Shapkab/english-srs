@@ -1,1 +1,0 @@
-\i ../supabase/schema.sql
