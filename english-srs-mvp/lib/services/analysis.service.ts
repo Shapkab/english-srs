@@ -58,8 +58,3 @@ export async function analyzeSubmissionText(text: string): Promise<AnalysisResul
     throw error;
   }
 }
-
-export function safeParseAnalysis(raw: unknown): AnalysisResultDTO | null {
-  const result = analysisResultSchema.safeParse(raw);
-  return result.success ? result.data : null;
-}

@@ -41,15 +41,30 @@ Submission
 
 ## Quick start
 
-1. Copy `.env.example` to `.env.local`
-2. Fill in Supabase and OpenAI keys
-3. Run DB migration in Supabase
-4. Install dependencies
+1. Copy `.env.example` to `.env.local` and fill in the keys (see **Environment variables** below).
+2. Install dependencies and bring the local Supabase stack up:
 
 ```bash
 npm install
+npx supabase start
+npx supabase db reset --local
 npm run dev
 ```
+
+The entire schema lives in `supabase/migrations/20260510000000_init.sql`. Future schema changes go in new `supabase/migrations/<YYYYMMDDHHMMSS>_<name>.sql` files; each migration must be plain SQL (no `\i` includes) and idempotent (`if not exists` / `create or replace` / `drop ... if exists`).
+
+## Environment variables
+
+`.env.example` is the source of truth. Each key:
+
+- `NEXT_PUBLIC_SUPABASE_URL`, `NEXT_PUBLIC_SUPABASE_ANON_KEY`, `SUPABASE_SERVICE_ROLE_KEY` — Supabase project credentials (point at the local stack or a hosted project).
+- `OPENAI_API_KEY` — required by the worker; analysis and card-generation calls fail without it.
+- `OPENAI_MODEL_ANALYSIS`, `OPENAI_MODEL_CARD_GENERATION` — optional model overrides (default `gpt-4.1-mini`).
+- `DEV_USER_ID` — dev-only bypass for bearer auth; set to a valid UUID. The auth helper auto-seeds the matching `users_profile` row so the first submission doesn't trip the FK.
+
+## RLS posture
+
+Row-Level Security is **enabled and forced** on every user-scoped table (and `jobs` is locked down to the service role). Routes use the user-scoped Supabase client and rely on `auth.uid()` policies; the worker uses the service-role key to bypass RLS for cross-user infrastructure tasks. Direct `psql` reads against a tenant's tables without `auth.uid()` set will return zero rows even as the table owner — that's intentional, not a bug.
 
 ## Suggested build order
 
