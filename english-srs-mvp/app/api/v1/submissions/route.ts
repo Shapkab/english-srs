@@ -38,3 +38,22 @@ export async function POST(request: Request) {
     return toErrorResponse(error, request);
   }
 }
+
+export async function GET(request: Request) {
+  try {
+    const { userId, supabase } = await requireUserContext(request);
+
+    const { data, error } = await supabase
+      .from('submissions')
+      .select('id, status, original_text, created_at')
+      .eq('user_id', userId)
+      .order('created_at', { ascending: false })
+      .limit(20);
+
+    if (error) throw error;
+
+    return NextResponse.json({ submissions: data ?? [] });
+  } catch (error) {
+    return toErrorResponse(error);
+  }
+}
