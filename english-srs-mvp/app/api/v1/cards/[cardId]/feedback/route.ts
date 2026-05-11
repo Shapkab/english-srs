@@ -28,6 +28,6 @@ export async function POST(request: Request, context: { params: Promise<{ cardId
 
     return NextResponse.json({ ok: true });
   } catch (error) {
-    return toErrorResponse(error);
+    return toErrorResponse(error, request);
   }
 }

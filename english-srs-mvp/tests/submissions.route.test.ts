@@ -106,7 +106,9 @@ suite('POST /api/v1/submissions', () => {
     const response = await POST(request);
     expect(response.status).toBe(401);
 
-    const json = (await response.json()) as Record<string, unknown>;
-    expect(json).toEqual({ code: 'unauthorized' });
+    const json = (await response.json()) as { code: string; requestId: string };
+    expect(json.code).toBe('unauthorized');
+    expect(typeof json.requestId).toBe('string');
+    expect(json.requestId.length).toBeGreaterThan(0);
   });
 });

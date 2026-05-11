@@ -1,5 +1,6 @@
 import { NextResponse } from 'next/server';
 import { ZodError } from 'zod';
+import { log, withRequestId } from '@/lib/observability/log';
 
 export class HttpError extends Error {
   constructor(
@@ -11,16 +12,32 @@ export class HttpError extends Error {
   }
 }
 
-export function toErrorResponse(error: unknown): NextResponse {
+export function toErrorResponse(error: unknown, request?: Request): NextResponse {
+  const requestId = request
+    ? withRequestId(request).requestId
+    : crypto.randomUUID();
+
   if (error instanceof HttpError) {
-    return NextResponse.json({ code: error.code }, { status: error.status });
+    return NextResponse.json(
+      { code: error.code, requestId },
+      { status: error.status },
+    );
   }
   if (error instanceof ZodError) {
     return NextResponse.json(
-      { code: 'validation_error', issues: error.issues },
+      { code: 'validation_error', issues: error.issues, requestId },
       { status: 400 },
     );
   }
-  console.error('[api]', error);
-  return NextResponse.json({ code: 'internal_error' }, { status: 500 });
+
+  const errObj = error instanceof Error ? error : undefined;
+  log.error('api_error', {
+    requestId,
+    method: request?.method,
+    path: request ? new URL(request.url).pathname : undefined,
+    errorName: errObj ? errObj.constructor.name : typeof error,
+    message: errObj ? errObj.message : String(error),
+    stack: errObj?.stack,
+  });
+  return NextResponse.json({ code: 'internal_error', requestId }, { status: 500 });
 }

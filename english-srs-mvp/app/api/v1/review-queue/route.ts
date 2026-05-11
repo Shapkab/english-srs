@@ -51,6 +51,6 @@ export async function GET(request: Request) {
 
     return NextResponse.json({ cards });
   } catch (error) {
-    return toErrorResponse(error);
+    return toErrorResponse(error, request);
   }
 }
