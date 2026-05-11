@@ -1,5 +1,6 @@
 import { NextResponse } from 'next/server';
 import { requireUserContext } from '@/lib/auth/user';
+import { uuidParam } from '@/lib/validators/path-params';
 import { processSubmission } from '@/lib/services/process-submission.service';
 import { toErrorResponse } from '@/lib/http/errors';
 
@@ -9,7 +10,8 @@ export async function POST(request: Request, context: { params: Promise<{ submis
   }
   try {
     const { userId } = await requireUserContext(request);
-    const { submissionId } = await context.params;
+    const { submissionId: rawSubmissionId } = await context.params;
+    const submissionId = uuidParam.parse(rawSubmissionId);
 
     const result = await processSubmission({ submissionId, userId });
 

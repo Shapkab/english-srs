@@ -1,11 +1,13 @@
 import { NextResponse } from 'next/server';
 import { requireUserContext } from '@/lib/auth/user';
+import { uuidParam } from '@/lib/validators/path-params';
 import { toErrorResponse } from '@/lib/http/errors';
 
 export async function GET(request: Request, context: { params: Promise<{ submissionId: string }> }) {
   try {
     const { userId, supabase } = await requireUserContext(request);
-    const { submissionId } = await context.params;
+    const { submissionId: rawSubmissionId } = await context.params;
+    const submissionId = uuidParam.parse(rawSubmissionId);
 
     const { data: analysis, error: analysisError } = await supabase
       .from('analyses')

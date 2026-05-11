@@ -1,12 +1,14 @@
 import { NextResponse } from 'next/server';
 import { feedbackSchema } from '@/lib/validators/api';
+import { uuidParam } from '@/lib/validators/path-params';
 import { requireUserContext } from '@/lib/auth/user';
 import { toErrorResponse } from '@/lib/http/errors';
 
 export async function POST(request: Request, context: { params: Promise<{ cardId: string }> }) {
   try {
     const { userId, supabase } = await requireUserContext(request);
-    const { cardId } = await context.params;
+    const { cardId: rawCardId } = await context.params;
+    const cardId = uuidParam.parse(rawCardId);
     const body = feedbackSchema.parse(await request.json());
 
     const { error: feedbackInsertError } = await supabase.from('card_feedback').insert({
