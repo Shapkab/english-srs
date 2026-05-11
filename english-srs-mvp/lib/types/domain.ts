@@ -44,8 +44,8 @@ export interface CardCandidate {
   cardType: CardType;
   front: string;
   back: string;
-  hint?: string;
-  example?: string;
+  hint: string;
+  example: string;
   priority: number;
 }
 

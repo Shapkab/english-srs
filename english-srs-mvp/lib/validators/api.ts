@@ -12,7 +12,7 @@ export const reviewSchema = z.object({
 
 export const feedbackSchema = z.object({
   type: z.enum(['not_useful', 'duplicate', 'too_easy', 'too_hard', 'wrong']),
-  note: z.string().trim().max(500).optional(),
+  note: z.string().trim().max(500).nullable().optional(),
 });
 
 export const issueSchema = z.object({
@@ -46,8 +46,8 @@ export const cardCandidateSchema = z.object({
   cardType: z.enum(['correction', 'cloze', 'choice', 'usage']),
   front: z.string().min(1).max(300),
   back: z.string().min(1).max(300),
-  hint: z.string().max(200).optional(),
-  example: z.string().max(300).optional(),
+  hint: z.string().max(200),
+  example: z.string().max(300),
   priority: z.number().int().min(1).max(100),
 });
 
