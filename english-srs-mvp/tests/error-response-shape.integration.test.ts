@@ -8,6 +8,13 @@ const UUID_REGEX = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12
 describe('toErrorResponse (R-014 structured logger wiring)', () => {
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   let consoleErrorSpy: MockInstance<any[], void>;
+  const ORIGINAL_NODE_ENV = process.env.NODE_ENV;
+
+  function setNodeEnv(value: string | undefined) {
+    const env = process.env as Record<string, string | undefined>;
+    if (value === undefined) delete env.NODE_ENV;
+    else env.NODE_ENV = value;
+  }
 
   beforeEach(() => {
     consoleErrorSpy = vi.spyOn(console, 'error').mockImplementation(() => undefined);
@@ -15,6 +22,7 @@ describe('toErrorResponse (R-014 structured logger wiring)', () => {
 
   afterEach(() => {
     consoleErrorSpy.mockRestore();
+    setNodeEnv(ORIGINAL_NODE_ENV);
   });
 
   it('internal error: emits a JSON log line + 500 body with matching requestId', async () => {
@@ -71,5 +79,39 @@ describe('toErrorResponse (R-014 structured logger wiring)', () => {
     const body = (await response.json()) as { code: string; requestId: string };
     expect(body.code).toBe('internal_error');
     expect(body.requestId).toMatch(UUID_REGEX);
+  });
+
+  it('NODE_ENV=production: api_error log omits the stack field; 500 body never carries it', async () => {
+    setNodeEnv('production');
+    const request = new Request('http://localhost/api/v1/submissions', { method: 'POST' });
+    const response = toErrorResponse(new Error('boom — prod'), request);
+    expect(response.status).toBe(500);
+
+    const body = (await response.json()) as Record<string, unknown>;
+    expect(body.code).toBe('internal_error');
+    expect(typeof body.requestId).toBe('string');
+    expect('stack' in body).toBe(false); // 500 body never carries stack
+
+    expect(consoleErrorSpy).toHaveBeenCalledTimes(1);
+    const logged = JSON.parse(consoleErrorSpy.mock.calls[0][0] as string) as Record<string, unknown>;
+    expect(logged.event).toBe('api_error');
+    expect(logged.errorName).toBe('Error');
+    expect(logged.message).toBe('boom — prod');
+    expect('stack' in logged).toBe(false); // production omits stack from logs
+  });
+
+  it('NODE_ENV=development: api_error log includes the stack field', async () => {
+    setNodeEnv('development');
+    const request = new Request('http://localhost/api/v1/submissions', { method: 'POST' });
+    const response = toErrorResponse(new Error('boom — dev'), request);
+    expect(response.status).toBe(500);
+
+    const body = (await response.json()) as Record<string, unknown>;
+    expect('stack' in body).toBe(false); // 500 body shape is unchanged
+
+    expect(consoleErrorSpy).toHaveBeenCalledTimes(1);
+    const logged = JSON.parse(consoleErrorSpy.mock.calls[0][0] as string) as Record<string, unknown>;
+    expect(typeof logged.stack).toBe('string');
+    expect(logged.stack as string).toMatch(/(^Error:|\bat\s)/); // recognisable stack-trace shape
   });
 });

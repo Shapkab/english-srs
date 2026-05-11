@@ -31,13 +31,14 @@ export function toErrorResponse(error: unknown, request?: Request): NextResponse
   }
 
   const errObj = error instanceof Error ? error : undefined;
+  const includeStack = process.env.NODE_ENV !== 'production' && errObj !== undefined;
   log.error('api_error', {
     requestId,
     method: request?.method,
     path: request ? new URL(request.url).pathname : undefined,
     errorName: errObj ? errObj.constructor.name : typeof error,
     message: errObj ? errObj.message : String(error),
-    stack: errObj?.stack,
+    ...(includeStack ? { stack: errObj.stack } : {}),
   });
   return NextResponse.json({ code: 'internal_error', requestId }, { status: 500 });
 }
