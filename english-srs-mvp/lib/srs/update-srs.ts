@@ -30,15 +30,15 @@ export function updateSrsState(state: SrsStateInput, rating: number): SrsStateOu
   }
 
   const now = new Date();
-  const dueAt = new Date(now);
-  dueAt.setDate(dueAt.getDate() + intervalDays);
+  const dueAt = new Date(now.getTime() + intervalDays * 86_400_000).toISOString();
+  const lastReviewedAt = now.toISOString();
 
   return {
     repetition,
     intervalDays,
     easeFactor,
     lapseCount,
-    dueAt: dueAt.toISOString(),
-    lastReviewedAt: now.toISOString(),
+    dueAt,
+    lastReviewedAt,
   };
 }
