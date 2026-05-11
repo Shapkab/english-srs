@@ -38,3 +38,21 @@ export async function POST(request: Request) {
     return toErrorResponse(error);
   }
 }
+
+export async function GET(request: Request) {
+  try {
+    const { supabase } = await requireUserContext(request);
+
+    const { data, error } = await supabase
+      .from('submissions')
+      .select('id, status, original_text, created_at')
+      .order('created_at', { ascending: false })
+      .limit(20);
+
+    if (error) throw error;
+
+    return NextResponse.json({ submissions: data ?? [] });
+  } catch (error) {
+    return toErrorResponse(error);
+  }
+}
