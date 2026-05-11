@@ -24,6 +24,7 @@ suite('DEV_USER_ID auto-seed of users_profile (R-015)', () => {
   let admin: SupabaseClient;
   const originalDevUserId = process.env.DEV_USER_ID;
   let testUserId = '';
+  let lastSubmissionId: string | null = null;
 
   beforeEach(() => {
     admin = createClient(url!, serviceKey!, {
@@ -31,6 +32,7 @@ suite('DEV_USER_ID auto-seed of users_profile (R-015)', () => {
     });
     testUserId = randomUuid();
     process.env.DEV_USER_ID = testUserId;
+    lastSubmissionId = null;
   });
 
   afterEach(async () => {
@@ -38,15 +40,25 @@ suite('DEV_USER_ID auto-seed of users_profile (R-015)', () => {
     if (originalDevUserId === undefined) delete process.env.DEV_USER_ID;
     else process.env.DEV_USER_ID = originalDevUserId;
 
-    // cleanup any rows the test created (best-effort)
-    if (testUserId) {
-      try {
+    // cleanup any rows the test created (best-effort).
+    // jobs has no FK to submissions; the POST handler enqueues a row keyed by
+    // payload->>submissionId, so we delete it explicitly to avoid leaking the
+    // pending job into the worker-claim test.
+    try {
+      if (lastSubmissionId) {
+        await admin
+          .from('jobs')
+          .delete()
+          .eq('payload->>submissionId', lastSubmissionId);
+      }
+      if (testUserId) {
         await admin.from('submissions').delete().eq('user_id', testUserId);
         await admin.from('users_profile').delete().eq('id', testUserId);
-      } catch {
-        /* best effort */
       }
+    } catch {
+      /* best effort */
     }
+    lastSubmissionId = null;
   });
 
   afterAll(() => {
@@ -66,6 +78,7 @@ suite('DEV_USER_ID auto-seed of users_profile (R-015)', () => {
 
     const json = (await response.json()) as { submissionId: string; status: string };
     expect(json.submissionId).toMatch(/^[0-9a-f-]{36}$/i);
+    lastSubmissionId = json.submissionId;
 
     const { data: profile } = await admin
       .from('users_profile')
