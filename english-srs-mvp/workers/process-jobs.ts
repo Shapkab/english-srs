@@ -7,6 +7,7 @@ import type { Database } from '@/lib/types/database.generated';
 
 export const STALE_CLAIM_MS = 5 * 60 * 1000;
 const POLL_IDLE_MS = 3000;
+const MAX_BACKOFF_MS = 60_000;
 
 interface PendingJobRow {
   id: string;
@@ -14,6 +15,40 @@ interface PendingJobRow {
   payload: { submissionId: string; userId: string } | Record<string, unknown>;
   attempts: number;
   max_attempts: number;
+}
+
+interface RetryableErrorShape {
+  status?: number;
+  code?: string;
+  message?: string;
+}
+
+export function classifyRetryable(err: unknown): boolean {
+  if (!err || typeof err !== 'object') return false;
+  const e = err as RetryableErrorShape;
+
+  // OpenAI SDK + most HTTP-client errors expose `status`.
+  if (typeof e.status === 'number') {
+    if (e.status === 429) return true;
+    if (e.status >= 500 && e.status < 600) return true;
+    // Any other HTTP status (4xx that isn't 429) is treated as terminal —
+    // those are deterministic, retrying won't change the answer.
+    return false;
+  }
+
+  // Network-layer errors from undici/fetch/node.
+  if (typeof e.code === 'string') {
+    if (e.code === 'ETIMEDOUT' || e.code === 'ECONNRESET' || e.code === 'ECONNREFUSED') {
+      return true;
+    }
+  }
+
+  // `fetch failed` is the generic node:fetch wrapper for network failures.
+  if (typeof e.message === 'string' && /fetch failed/i.test(e.message)) {
+    return true;
+  }
+
+  return false;
 }
 
 export async function recoverStaleClaims(
@@ -64,8 +99,8 @@ export async function processOneJob(supabase: SupabaseClient<Database>): Promise
     } as never)
     .eq('id', nextJob.id)
     .eq('status', 'pending')
-    .select('id, type, payload, attempts')
-    .maybeSingle();
+    .select('id, type, payload, attempts, max_attempts')
+    .maybeSingle<PendingJobRow>();
   if (claimErr) throw claimErr;
   if (!job) return true;
 
@@ -83,15 +118,48 @@ export async function processOneJob(supabase: SupabaseClient<Database>): Promise
     if (doneErr) throw doneErr;
   } catch (error) {
     console.error('[worker] failed job', job.id, error);
-    const { error: failErr } = await supabase
-      .from('jobs')
-      .update({
-        status: 'failed',
-        claimed_at: null,
-        last_error: error instanceof Error ? error.message : 'Unknown error',
-      } as never)
-      .eq('id', job.id);
-    if (failErr) console.error('[worker] failed-state update error', failErr);
+    const isRetryable = classifyRetryable(error);
+    const willRetry = isRetryable && job.attempts < job.max_attempts;
+    const reason = error instanceof Error ? error.message : String(error);
+
+    if (willRetry) {
+      const backoffMs = Math.min(MAX_BACKOFF_MS, 2 ** job.attempts * 1_000);
+      const { error: requeueErr } = await supabase
+        .from('jobs')
+        .update({
+          status: 'pending',
+          claimed_at: null,
+          available_at: new Date(Date.now() + backoffMs).toISOString(),
+          last_error: reason,
+        } as never)
+        .eq('id', job.id);
+      if (requeueErr) console.error('[worker] requeue update error', requeueErr);
+    } else {
+      const { error: failErr } = await supabase
+        .from('jobs')
+        .update({ status: 'failed', claimed_at: null, last_error: reason } as never)
+        .eq('id', job.id);
+      if (failErr) console.error('[worker] failed-state update error', failErr);
+
+      const payload = job.payload as { submissionId?: string; userId?: string };
+      if (payload?.submissionId && payload?.userId) {
+        // mark_submission_failed lives in the post-008 schema but isn't in
+        // database.generated.ts yet (regen happens in β4); cast the name to
+        // bypass the union check, then `as never` for the params (same
+        // pattern as the surrounding `.update(...)` calls).
+        const { error: markErr } = await (
+          supabase.rpc as unknown as (
+            fn: 'mark_submission_failed',
+            args: { p_submission_id: string; p_user_id: string; p_reason: string },
+          ) => Promise<{ error: unknown }>
+        )('mark_submission_failed', {
+          p_submission_id: payload.submissionId,
+          p_user_id: payload.userId,
+          p_reason: reason,
+        });
+        if (markErr) console.error('[worker] mark_submission_failed error', markErr);
+      }
+    }
   }
 
   return true;
