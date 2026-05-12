@@ -1,7 +1,15 @@
 import type { AnalysisIssueDTO, NormalizedLearningTarget } from '@/lib/types/domain';
 
 function normalizeText(value: string): string {
-  return value.trim().toLowerCase();
+  return value
+    .normalize('NFKC')
+    .replace(/[‘’‚‛]/g, "'")
+    .replace(/[“”„‟]/g, '"')
+    .replace(/[–—]/g, '-')
+    .replace(/ /g, ' ')
+    .toLowerCase()
+    .replace(/\s+/g, ' ')
+    .trim();
 }
 
 export function normalizeIssueToLearningTarget(issue: AnalysisIssueDTO): NormalizedLearningTarget {
