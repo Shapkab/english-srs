@@ -133,7 +133,7 @@ suite('persist_submission_analysis', () => {
       p_issues: issues,
       p_normalized_targets: normalizedTargets,
       p_card_candidates: cardCandidates,
-    } as never);
+    });
     expect(error).toBeNull();
 
     const result = (Array.isArray(data) ? data[0] : data) as PersistResult;
@@ -206,7 +206,7 @@ suite('persist_submission_analysis', () => {
       p_issues: issues,
       p_normalized_targets: normalizedTargets,
       p_card_candidates: cardCandidates,
-    } as never);
+    });
     expect(error).toBeNull();
 
     const result = (Array.isArray(data) ? data[0] : data) as PersistResult;
@@ -242,7 +242,7 @@ suite('persist_submission_analysis', () => {
       p_issues: [],
       p_normalized_targets: [],
       p_card_candidates: [],
-    } as never);
+    });
     expect(error).not.toBeNull();
     expect(error?.code).toBe('42501');
   });
