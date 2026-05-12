@@ -63,3 +63,116 @@ describe('updateSrsState — DST-safe UTC arithmetic', () => {
     expect(actualDueMs).toBe(expectedDueMs);
   });
 });
+
+// These tests pin down the SM-2 math both the TS reference impl and the SQL
+// record_review body must implement identically. Any drift between the two
+// becomes a CI failure.
+describe('updateSrsState — SM-2 math', () => {
+  describe('lapse path (rating < 3)', () => {
+    it('resets repetition to 0, sets interval=1, increments lapseCount, leaves ease unchanged', () => {
+      const result = updateSrsState(
+        { repetition: 5, intervalDays: 30, easeFactor: 2.4, lapseCount: 2 },
+        2,
+      );
+      expect(result.repetition).toBe(0);
+      expect(result.intervalDays).toBe(1);
+      expect(result.lapseCount).toBe(3);
+      expect(result.easeFactor).toBe(2.4);
+    });
+
+    it('applies the lapse path for rating=0, 1, and 2 alike', () => {
+      for (const rating of [0, 1, 2]) {
+        const result = updateSrsState(
+          { repetition: 3, intervalDays: 12, easeFactor: 2.5, lapseCount: 0 },
+          rating,
+        );
+        expect(result.repetition).toBe(0);
+        expect(result.intervalDays).toBe(1);
+        expect(result.lapseCount).toBe(1);
+        expect(result.easeFactor).toBe(2.5);
+      }
+    });
+  });
+
+  describe('success ramp-up (rating >= 3)', () => {
+    it('first success from repetition=0 → repetition=1, interval=1', () => {
+      const result = updateSrsState(
+        { repetition: 0, intervalDays: 0, easeFactor: 2.5, lapseCount: 0 },
+        4,
+      );
+      expect(result.repetition).toBe(1);
+      expect(result.intervalDays).toBe(1);
+    });
+
+    it('second success from repetition=1 → repetition=2, interval=3', () => {
+      const result = updateSrsState(
+        { repetition: 1, intervalDays: 1, easeFactor: 2.5, lapseCount: 0 },
+        4,
+      );
+      expect(result.repetition).toBe(2);
+      expect(result.intervalDays).toBe(3);
+    });
+
+    it('subsequent successes scale interval by ease (round(interval * ease))', () => {
+      // From (rep=2, interval=3, ease=2.5): next interval should be round(3 * 2.5) = 8.
+      const result = updateSrsState(
+        { repetition: 2, intervalDays: 3, easeFactor: 2.5, lapseCount: 0 },
+        4,
+      );
+      expect(result.repetition).toBe(3);
+      expect(result.intervalDays).toBe(8);
+
+      // From (rep=3, interval=8, ease=2.5): next interval should be round(8 * 2.5) = 20.
+      const next = updateSrsState(
+        { repetition: 3, intervalDays: 8, easeFactor: 2.5, lapseCount: 0 },
+        4,
+      );
+      expect(next.intervalDays).toBe(20);
+    });
+  });
+
+  describe('ease adjustment', () => {
+    it('rating=5 raises ease (delta = +0.10)', () => {
+      const result = updateSrsState(
+        { repetition: 2, intervalDays: 6, easeFactor: 2.5, lapseCount: 0 },
+        5,
+      );
+      // delta = 0.1 - (5 - 5) * (0.08 + (5 - 5) * 0.02) = 0.1
+      expect(result.easeFactor).toBeCloseTo(2.6, 10);
+    });
+
+    it('rating=4 leaves ease unchanged (delta = 0)', () => {
+      const result = updateSrsState(
+        { repetition: 2, intervalDays: 6, easeFactor: 2.5, lapseCount: 0 },
+        4,
+      );
+      // delta = 0.1 - (5 - 4) * (0.08 + (5 - 4) * 0.02) = 0.1 - 1 * 0.10 = 0
+      expect(result.easeFactor).toBeCloseTo(2.5, 10);
+    });
+
+    it('rating=3 lowers ease (delta = -0.14)', () => {
+      const result = updateSrsState(
+        { repetition: 2, intervalDays: 6, easeFactor: 2.5, lapseCount: 0 },
+        3,
+      );
+      // delta = 0.1 - (5 - 3) * (0.08 + (5 - 3) * 0.02) = 0.1 - 2 * 0.12 = -0.14
+      expect(result.easeFactor).toBeCloseTo(2.36, 10);
+    });
+
+    it('ease floor at 1.3: repeated rating=3 drives ease down but never below 1.3', () => {
+      let state = { repetition: 2, intervalDays: 6, easeFactor: 2.5, lapseCount: 0 };
+      for (let i = 0; i < 50; i += 1) {
+        const result = updateSrsState(state, 3);
+        expect(result.easeFactor).toBeGreaterThanOrEqual(1.3);
+        state = {
+          repetition: result.repetition,
+          intervalDays: result.intervalDays,
+          easeFactor: result.easeFactor,
+          lapseCount: result.lapseCount,
+        };
+      }
+      // After 50 rating=3 reviews ease must have hit the floor.
+      expect(state.easeFactor).toBe(1.3);
+    });
+  });
+});
