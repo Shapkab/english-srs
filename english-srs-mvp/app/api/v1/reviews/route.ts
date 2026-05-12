@@ -3,6 +3,7 @@ import { reviewSchema } from '@/lib/validators/api';
 import { requireUserContext } from '@/lib/auth/user';
 import { updateSrsState } from '@/lib/srs/update-srs';
 import { toErrorResponse } from '@/lib/http/errors';
+import { getSupabaseAdmin } from '@/lib/db/server';
 
 export async function POST(request: Request) {
   try {
@@ -28,7 +29,7 @@ export async function POST(request: Request) {
       body.rating,
     );
 
-    const { data: nextDueAt, error: rpcError } = await supabase.rpc(
+    const { data: nextDueAt, error: rpcError } = await getSupabaseAdmin().rpc(
       'record_review',
       {
         p_card_id: body.cardId,

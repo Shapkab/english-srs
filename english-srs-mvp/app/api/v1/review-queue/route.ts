@@ -25,6 +25,7 @@ export async function GET(request: Request) {
       .from('srs_state')
       .select('due_at, cards!inner(id, card_type, front, hint, status)')
       .eq('user_id', userId)
+      .eq('cards.status', 'active')
       .lte('due_at', now)
       .order('due_at', { ascending: true })
       .limit(20);
@@ -32,22 +33,16 @@ export async function GET(request: Request) {
     if (error) throw error;
 
     const parsedRows = z.array(reviewQueueRowSchema).parse(data ?? []);
-    const cards = parsedRows
-      .map((row) => ({
-        due_at: row.due_at,
-        card: Array.isArray(row.cards) ? row.cards[0] ?? null : row.cards,
-      }))
-      .filter((row) => row.card?.status === 'active')
-      .map((row) => {
-        const card = row.card!;
-        return {
-          cardId: card.id,
-          cardType: card.card_type,
-          front: card.front,
-          hint: card.hint,
-          dueAt: row.due_at,
-        };
-      });
+    const cards = parsedRows.map((row) => {
+      const card = Array.isArray(row.cards) ? row.cards[0] ?? null : row.cards;
+      return {
+        cardId: card!.id,
+        cardType: card!.card_type,
+        front: card!.front,
+        hint: card!.hint,
+        dueAt: row.due_at,
+      };
+    });
 
     return NextResponse.json({ cards });
   } catch (error) {
