@@ -6,7 +6,6 @@ function makeIssue(overrides: Partial<AnalysisIssueDTO> & { category: IssueCateg
   return {
     errorText: '',
     correctedText: '',
-    category: overrides.category,
     subcategory: null,
     explanationShort: 'short explanation',
     confidence: 0.9,
