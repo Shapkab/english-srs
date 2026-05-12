@@ -1,6 +1,5 @@
-import { afterAll, beforeAll, describe, expect, it } from 'vitest';
+import { afterAll, beforeAll, beforeEach, describe, expect, it } from 'vitest';
 import { createClient, type SupabaseClient } from '@supabase/supabase-js';
-import { updateSrsState } from '@/lib/srs/update-srs';
 
 const url = process.env.NEXT_PUBLIC_SUPABASE_URL;
 const serviceKey = process.env.SUPABASE_SERVICE_ROLE_KEY;
@@ -20,7 +19,7 @@ function suffix() {
   return `${Date.now()}-${Math.random().toString(36).slice(2, 8)}`;
 }
 
-suite('record_review', () => {
+suite('record_review (SM-2 in SQL, FOR UPDATE)', () => {
   let admin: SupabaseClient;
   let userId: string;
   let otherUserId: string;
@@ -74,7 +73,14 @@ suite('record_review', () => {
       .single();
     if (cardErr || !card) throw cardErr ?? new Error('seed card failed');
     cardId = card.id;
+  });
 
+  beforeEach(async () => {
+    // Reset srs_state to a known baseline between tests so each case starts
+    // from repetition=0, interval=0, ease=2.5, lapse=0 and there are no
+    // leftover reviews rows from the previous case.
+    await admin.from('reviews').delete().eq('card_id', cardId);
+    await admin.from('srs_state').delete().eq('card_id', cardId);
     const { error: srsErr } = await admin.from('srs_state').insert({
       card_id: cardId,
       user_id: userId,
@@ -99,29 +105,15 @@ suite('record_review', () => {
     }
   });
 
-  it('happy path: inserts review, advances srs_state, returns new due_at', async () => {
-    const updated = updateSrsState(
-      { repetition: 0, intervalDays: 0, easeFactor: 2.5, lapseCount: 0 },
-      4,
-    );
-
+  it('happy path: inserts review, advances srs_state from rep=0 (first success → interval=1)', async () => {
     const { data: nextDueAt, error } = await admin.rpc('record_review', {
       p_card_id: cardId,
       p_user_id: userId,
       p_rating: 4,
       p_response_ms: 1500,
-      p_repetition: updated.repetition,
-      p_interval_days: updated.intervalDays,
-      p_ease_factor: updated.easeFactor,
-      p_lapse_count: updated.lapseCount,
-      p_due_at: updated.dueAt,
-      p_last_reviewed_at: updated.lastReviewedAt,
     } as never);
     expect(error).toBeNull();
     expect(typeof nextDueAt === 'string' || nextDueAt instanceof Date).toBe(true);
-
-    // Compare as ISO timestamps (Postgres may return ISO+microseconds; align via Date.parse).
-    expect(Date.parse(String(nextDueAt))).toBe(Date.parse(updated.dueAt));
 
     const { data: reviewRows } = await admin
       .from('reviews')
@@ -137,33 +129,58 @@ suite('record_review', () => {
       .select('repetition, interval_days, due_at')
       .eq('card_id', cardId)
       .single();
-    expect(srsRow!.repetition).toBe(updated.repetition);
-    expect(srsRow!.interval_days).toBe(updated.intervalDays);
-    expect(Date.parse(String(srsRow!.due_at))).toBe(Date.parse(updated.dueAt));
+    expect(srsRow!.repetition).toBe(1);
+    expect(srsRow!.interval_days).toBe(1);
+    expect(Date.parse(String(srsRow!.due_at))).toBe(Date.parse(String(nextDueAt)));
   });
 
   it('ownership rejection: rpc errors when p_user_id does not own the srs_state row', async () => {
-    const updated = updateSrsState(
-      { repetition: 0, intervalDays: 0, easeFactor: 2.5, lapseCount: 0 },
-      3,
-    );
-
     const { error } = await admin.rpc('record_review', {
       p_card_id: cardId,
       p_user_id: otherUserId,
       p_rating: 3,
       p_response_ms: 500,
-      p_repetition: updated.repetition,
-      p_interval_days: updated.intervalDays,
-      p_ease_factor: updated.easeFactor,
-      p_lapse_count: updated.lapseCount,
-      p_due_at: updated.dueAt,
-      p_last_reviewed_at: updated.lastReviewedAt,
     } as never);
     expect(error).not.toBeNull();
-    // `RAISE … USING errcode = 'no_data_found'` surfaces as the
-    // plpgsql-specific code P0002 (the SQL standard `02000` no_data class
-    // is what the spec referenced).
-    expect(error?.code).toBe('P0002');
+    // `RAISE … USING errcode = '42501'` (insufficient_privilege) surfaces here
+    // for the not-found case, matching the new SQL function body.
+    expect(error?.code).toBe('42501');
+  });
+
+  it('concurrency: two parallel calls serialize under FOR UPDATE; no lost update', async () => {
+    // Both calls bump the same srs_state row from rep=0. The FOR UPDATE row
+    // lock makes them serial, so one final state lands with rep=2 and exactly
+    // two reviews rows are inserted — no row is lost, no race over the
+    // intermediate state.
+    const [r1, r2] = await Promise.all([
+      admin.rpc('record_review', {
+        p_card_id: cardId,
+        p_user_id: userId,
+        p_rating: 4,
+        p_response_ms: 100,
+      } as never),
+      admin.rpc('record_review', {
+        p_card_id: cardId,
+        p_user_id: userId,
+        p_rating: 4,
+        p_response_ms: 200,
+      } as never),
+    ]);
+    expect(r1.error).toBeNull();
+    expect(r2.error).toBeNull();
+
+    const { data: reviewRows } = await admin
+      .from('reviews')
+      .select('id')
+      .eq('card_id', cardId)
+      .eq('user_id', userId);
+    expect(reviewRows ?? []).toHaveLength(2);
+
+    const { data: srsRow } = await admin
+      .from('srs_state')
+      .select('repetition')
+      .eq('card_id', cardId)
+      .single();
+    expect(srsRow!.repetition).toBe(2);
   });
 });
