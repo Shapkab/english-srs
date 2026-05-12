@@ -3,7 +3,9 @@
 type Fields = Record<string, unknown>;
 
 function emit(level: 'error' | 'warn' | 'info' | 'debug', event: string, fields: Fields) {
-  console.error(JSON.stringify({ level, time: new Date().toISOString(), event, ...fields }));
+  const line = JSON.stringify({ level, time: new Date().toISOString(), event, ...fields });
+  if (level === 'error' || level === 'warn') console.error(line);
+  else console.log(line);
 }
 
 export const log = {
