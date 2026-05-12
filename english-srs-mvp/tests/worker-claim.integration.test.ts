@@ -78,7 +78,7 @@ suite('worker claim semantics', () => {
         status: 'processing',
         attempts: 1,
         claimed_at: tenMinAgo,
-      } as never)
+      })
       .select('id')
       .single();
     if (insErr || !inserted) throw insErr ?? new Error('insert stale job failed');
@@ -106,7 +106,7 @@ suite('worker claim semantics', () => {
         status: 'pending',
         attempts: 3,
         max_attempts: 3,
-      } as never)
+      })
       .select('id')
       .single();
     if (insErr || !inserted) throw insErr ?? new Error('insert capped job failed');
@@ -180,7 +180,7 @@ suite('worker retry-with-backoff and terminal failure (H2, H3)', () => {
         source_type: 'text',
         original_text: `worker-retry probe ${suffix()}`,
         status: 'pending',
-      } as never)
+      })
       .select('id')
       .single();
     if (subErr || !sub) throw subErr ?? new Error('seed submission failed');
@@ -195,7 +195,7 @@ suite('worker retry-with-backoff and terminal failure (H2, H3)', () => {
         status: 'pending',
         attempts: 0,
         max_attempts: 3,
-      } as never)
+      })
       .select('id')
       .single();
     if (jobErr || !job) throw jobErr ?? new Error('seed job failed');
@@ -257,7 +257,7 @@ suite('worker retry-with-backoff and terminal failure (H2, H3)', () => {
     // Simulate backoff elapsing: move available_at to the past, then process again.
     await admin
       .from('jobs')
-      .update({ available_at: new Date(Date.now() - 1000).toISOString() } as never)
+      .update({ available_at: new Date(Date.now() - 1000).toISOString() })
       .eq('id', jobId);
 
     const worked2 = await isolateAndProcess(jobId);

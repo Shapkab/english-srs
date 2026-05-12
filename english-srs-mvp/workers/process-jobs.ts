@@ -58,7 +58,7 @@ export async function recoverStaleClaims(
   const cutoff = new Date(Date.now() - staleAfterMs).toISOString();
   const { data, error } = await supabase
     .from('jobs')
-    .update({ status: 'pending', claimed_at: null } as never)
+    .update({ status: 'pending', claimed_at: null })
     .eq('status', 'processing')
     .lt('claimed_at', cutoff)
     .select('id');
@@ -96,7 +96,7 @@ export async function processOneJob(supabase: SupabaseClient<Database>): Promise
       status: 'processing',
       attempts: nextJob.attempts + 1,
       claimed_at: new Date().toISOString(),
-    } as never)
+    })
     .eq('id', nextJob.id)
     .eq('status', 'pending')
     .select('id, type, payload, attempts, max_attempts')
@@ -113,7 +113,7 @@ export async function processOneJob(supabase: SupabaseClient<Database>): Promise
 
     const { error: doneErr } = await supabase
       .from('jobs')
-      .update({ status: 'done', claimed_at: null } as never)
+      .update({ status: 'done', claimed_at: null })
       .eq('id', job.id);
     if (doneErr) throw doneErr;
   } catch (error) {
@@ -131,28 +131,19 @@ export async function processOneJob(supabase: SupabaseClient<Database>): Promise
           claimed_at: null,
           available_at: new Date(Date.now() + backoffMs).toISOString(),
           last_error: reason,
-        } as never)
+        })
         .eq('id', job.id);
       if (requeueErr) console.error('[worker] requeue update error', requeueErr);
     } else {
       const { error: failErr } = await supabase
         .from('jobs')
-        .update({ status: 'failed', claimed_at: null, last_error: reason } as never)
+        .update({ status: 'failed', claimed_at: null, last_error: reason })
         .eq('id', job.id);
       if (failErr) console.error('[worker] failed-state update error', failErr);
 
       const payload = job.payload as { submissionId?: string; userId?: string };
       if (payload?.submissionId && payload?.userId) {
-        // mark_submission_failed lives in the post-008 schema but isn't in
-        // database.generated.ts yet (regen happens in β4); cast the name to
-        // bypass the union check, then `as never` for the params (same
-        // pattern as the surrounding `.update(...)` calls).
-        const { error: markErr } = await (
-          supabase.rpc as unknown as (
-            fn: 'mark_submission_failed',
-            args: { p_submission_id: string; p_user_id: string; p_reason: string },
-          ) => Promise<{ error: unknown }>
-        )('mark_submission_failed', {
+        const { error: markErr } = await supabase.rpc('mark_submission_failed', {
           p_submission_id: payload.submissionId,
           p_user_id: payload.userId,
           p_reason: reason,

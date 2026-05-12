@@ -111,7 +111,7 @@ suite('record_review (SM-2 in SQL, FOR UPDATE)', () => {
       p_user_id: userId,
       p_rating: 4,
       p_response_ms: 1500,
-    } as never);
+    });
     expect(error).toBeNull();
     expect(typeof nextDueAt === 'string' || nextDueAt instanceof Date).toBe(true);
 
@@ -140,7 +140,7 @@ suite('record_review (SM-2 in SQL, FOR UPDATE)', () => {
       p_user_id: otherUserId,
       p_rating: 3,
       p_response_ms: 500,
-    } as never);
+    });
     expect(error).not.toBeNull();
     // `RAISE … USING errcode = '42501'` (insufficient_privilege) surfaces here
     // for the not-found case, matching the new SQL function body.
@@ -158,13 +158,13 @@ suite('record_review (SM-2 in SQL, FOR UPDATE)', () => {
         p_user_id: userId,
         p_rating: 4,
         p_response_ms: 100,
-      } as never),
+      }),
       admin.rpc('record_review', {
         p_card_id: cardId,
         p_user_id: userId,
         p_rating: 4,
         p_response_ms: 200,
-      } as never),
+      }),
     ]);
     expect(r1.error).toBeNull();
     expect(r2.error).toBeNull();

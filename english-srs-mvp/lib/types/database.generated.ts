@@ -182,11 +182,11 @@ export type Database = {
         }
         Relationships: [
           {
-            foreignKeyName: "card_feedback_card_id_fkey"
-            columns: ["card_id"]
+            foreignKeyName: "card_feedback_card_id_user_id_fkey"
+            columns: ["card_id", "user_id"]
             isOneToOne: false
             referencedRelation: "cards"
-            referencedColumns: ["id"]
+            referencedColumns: ["id", "user_id"]
           },
           {
             foreignKeyName: "card_feedback_user_id_fkey"
@@ -526,6 +526,7 @@ export type Database = {
       submissions: {
         Row: {
           created_at: string
+          failure_reason: string | null
           id: string
           language: string
           original_text: string
@@ -535,6 +536,7 @@ export type Database = {
         }
         Insert: {
           created_at?: string
+          failure_reason?: string | null
           id?: string
           language?: string
           original_text: string
@@ -544,6 +546,7 @@ export type Database = {
         }
         Update: {
           created_at?: string
+          failure_reason?: string | null
           id?: string
           language?: string
           original_text?: string
@@ -587,6 +590,10 @@ export type Database = {
       [_ in never]: never
     }
     Functions: {
+      mark_submission_failed: {
+        Args: { p_reason: string; p_submission_id: string; p_user_id: string }
+        Returns: undefined
+      }
       persist_submission_analysis: {
         Args: {
           p_card_candidates: Json
@@ -608,13 +615,7 @@ export type Database = {
       record_review: {
         Args: {
           p_card_id: string
-          p_due_at: string
-          p_ease_factor: number
-          p_interval_days: number
-          p_lapse_count: number
-          p_last_reviewed_at: string
           p_rating: number
-          p_repetition: number
           p_response_ms: number
           p_user_id: string
         }

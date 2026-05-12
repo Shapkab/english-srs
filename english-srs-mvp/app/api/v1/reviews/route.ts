@@ -25,8 +25,8 @@ export async function POST(request: Request) {
         p_card_id: body.cardId,
         p_user_id: userId,
         p_rating: body.rating,
-        p_response_ms: body.responseMs ?? null,
-      } as never,
+        p_response_ms: body.responseMs ?? 0,
+      },
     );
     if (rpcError) throw rpcError;
 
