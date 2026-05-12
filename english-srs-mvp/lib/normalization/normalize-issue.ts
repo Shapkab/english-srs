@@ -1,7 +1,26 @@
+// Canonical-key normalization for LearningTarget dedupe.
+//
+// Today: NFKC + quote/whitespace canonicalization + lowercasing.
+//
+// Known gaps (intentional, deferred to a future PR):
+//   - No lemmatization. "go" / "goes" / "went" produce distinct keys for word_form.
+//   - No locale variants. "color" / "colour" produce distinct keys.
+//   - No embedding-based near-duplicate dedupe.
+//
+// If you change this function, update tests/normalize-issue.unit.test.ts.
+
 import type { AnalysisIssueDTO, NormalizedLearningTarget } from '@/lib/types/domain';
 
 function normalizeText(value: string): string {
-  return value.trim().toLowerCase();
+  return value
+    .normalize('NFKC')
+    .replace(/[‘’‚‛]/g, "'")
+    .replace(/[“”„‟]/g, '"')
+    .replace(/[–—]/g, '-')
+    .replace(/ /g, ' ')
+    .toLowerCase()
+    .replace(/\s+/g, ' ')
+    .trim();
 }
 
 export function normalizeIssueToLearningTarget(issue: AnalysisIssueDTO): NormalizedLearningTarget {
