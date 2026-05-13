@@ -427,6 +427,35 @@ export type Database = {
           },
         ]
       }
+      rate_limits: {
+        Row: {
+          bucket: string
+          count: number
+          user_id: string
+          window_started_at: string
+        }
+        Insert: {
+          bucket: string
+          count?: number
+          user_id: string
+          window_started_at?: string
+        }
+        Update: {
+          bucket?: string
+          count?: number
+          user_id?: string
+          window_started_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "rate_limits_user_id_fkey"
+            columns: ["user_id"]
+            isOneToOne: false
+            referencedRelation: "users_profile"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       reviews: {
         Row: {
           card_id: string
@@ -590,6 +619,19 @@ export type Database = {
       [_ in never]: never
     }
     Functions: {
+      check_and_consume_rate_limit: {
+        Args: {
+          p_bucket: string
+          p_max: number
+          p_user_id: string
+          p_window_seconds: number
+        }
+        Returns: {
+          allowed: boolean
+          remaining: number
+          reset_at: string
+        }[]
+      }
       mark_submission_failed: {
         Args: { p_reason: string; p_submission_id: string; p_user_id: string }
         Returns: undefined

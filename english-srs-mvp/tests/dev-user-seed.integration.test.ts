@@ -23,6 +23,7 @@ function randomUuid(): string {
 suite('DEV_USER_ID auto-seed of users_profile (R-015)', () => {
   let admin: SupabaseClient;
   const originalDevUserId = process.env.DEV_USER_ID;
+  const originalEnableDevAuth = process.env.ENABLE_DEV_AUTH;
   let testUserId = '';
   let lastSubmissionId: string | null = null;
 
@@ -32,6 +33,7 @@ suite('DEV_USER_ID auto-seed of users_profile (R-015)', () => {
     });
     testUserId = randomUuid();
     process.env.DEV_USER_ID = testUserId;
+    process.env.ENABLE_DEV_AUTH = '1';
     lastSubmissionId = null;
   });
 
@@ -39,6 +41,8 @@ suite('DEV_USER_ID auto-seed of users_profile (R-015)', () => {
     // restore env
     if (originalDevUserId === undefined) delete process.env.DEV_USER_ID;
     else process.env.DEV_USER_ID = originalDevUserId;
+    if (originalEnableDevAuth === undefined) delete process.env.ENABLE_DEV_AUTH;
+    else process.env.ENABLE_DEV_AUTH = originalEnableDevAuth;
 
     // cleanup any rows the test created (best-effort).
     // jobs has no FK to submissions; the POST handler enqueues a row keyed by
@@ -64,6 +68,8 @@ suite('DEV_USER_ID auto-seed of users_profile (R-015)', () => {
   afterAll(() => {
     if (originalDevUserId === undefined) delete process.env.DEV_USER_ID;
     else process.env.DEV_USER_ID = originalDevUserId;
+    if (originalEnableDevAuth === undefined) delete process.env.ENABLE_DEV_AUTH;
+    else process.env.ENABLE_DEV_AUTH = originalEnableDevAuth;
   });
 
   it('first submission with DEV_USER_ID auto-seeds users_profile and writes successfully', async () => {

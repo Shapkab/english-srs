@@ -31,7 +31,11 @@ export async function requireUserContext(request: Request): Promise<UserContext>
     return { userId: data.user.id, supabase };
   }
 
-  if (process.env.NODE_ENV !== 'production' && process.env.DEV_USER_ID) {
+  if (
+    process.env.NODE_ENV !== 'production' &&
+    process.env.DEV_USER_ID &&
+    process.env.ENABLE_DEV_AUTH === '1'
+  ) {
     const devUserId = process.env.DEV_USER_ID;
     if (!UUID_REGEX.test(devUserId)) {
       throw new HttpError(500, 'invalid_dev_user_id');
