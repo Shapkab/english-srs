@@ -61,6 +61,9 @@ The entire schema lives in `supabase/migrations/20260510000000_init.sql`. Future
 - `OPENAI_API_KEY` — required by the worker; analysis and card-generation calls fail without it.
 - `OPENAI_MODEL_ANALYSIS`, `OPENAI_MODEL_CARD_GENERATION` — optional model overrides (default `gpt-4.1-mini`).
 - `DEV_USER_ID` — dev-only bypass for bearer auth; set to a valid UUID. The auth helper auto-seeds the matching `users_profile` row so the first submission doesn't trip the FK.
+- `ENABLE_DEV_AUTH` — required (`=1`) to activate the `DEV_USER_ID`
+  bypass. Belt-and-suspenders against accidental production exposure
+  when `NODE_ENV` defaults to `development` on non-Vercel hosts.
 
 ## RLS posture
 
