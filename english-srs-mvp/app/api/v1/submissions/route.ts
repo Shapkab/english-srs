@@ -3,12 +3,27 @@ import { createSubmissionSchema } from '@/lib/validators/api';
 import { requireUserContext } from '@/lib/auth/user';
 import { getSupabaseAdmin } from '@/lib/db/server';
 import { trackEvent } from '@/lib/analytics/events';
-import { toErrorResponse } from '@/lib/http/errors';
+import { HttpError, toErrorResponse } from '@/lib/http/errors';
+
+const RATE_LIMIT_SUBMISSIONS_PER_HOUR = 30;
 
 export async function POST(request: Request) {
   try {
     const { userId, supabase } = await requireUserContext(request);
     const body = createSubmissionSchema.parse(await request.json());
+
+    const admin = getSupabaseAdmin();
+    const { data: rlData, error: rlErr } = await admin.rpc('check_and_consume_rate_limit', {
+      p_user_id: userId,
+      p_bucket: 'submissions',
+      p_max: RATE_LIMIT_SUBMISSIONS_PER_HOUR,
+      p_window_seconds: 3600,
+    });
+    if (rlErr) throw rlErr;
+    const rl = rlData?.[0];
+    if (!rl?.allowed) {
+      throw new HttpError(429, 'rate_limited');
+    }
 
     const { data: submission, error } = await supabase
       .from('submissions')
@@ -22,7 +37,7 @@ export async function POST(request: Request) {
 
     if (error || !submission) throw error ?? new Error('Failed to create submission');
 
-    const { error: jobInsertError } = await getSupabaseAdmin()
+    const { error: jobInsertError } = await admin
       .from('jobs')
       .insert({
         type: 'analyze_submission',
