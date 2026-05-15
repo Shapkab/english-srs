@@ -5,6 +5,7 @@ import type { Route } from 'next';
 import { useRouter } from 'next/navigation';
 import { use, useEffect, useState } from 'react';
 import { fetchWithAuth } from '@/lib/api/client';
+import { toUserMessage, type ErrorPayload } from '@/lib/api/error-messages';
 import { getBrowserSupabase } from '@/lib/supabase/browser';
 
 const LOGIN_ROUTE = '/login' as Route;
@@ -69,8 +70,8 @@ export default function SubmissionDetailPage({ params }: { params: Promise<{ id:
       try {
         const res = await fetchWithAuth(`/api/v1/submissions/${id}/analysis`);
         if (!res.ok) {
-          const body = (await res.json().catch(() => ({}))) as { code?: string };
-          throw new Error(body.code ?? `HTTP ${res.status}`);
+          const body = (await res.json().catch(() => ({}))) as ErrorPayload;
+          throw new Error(toUserMessage(body, res.status));
         }
         const body = (await res.json()) as AnalysisResponse;
         if (cancelled) return;
