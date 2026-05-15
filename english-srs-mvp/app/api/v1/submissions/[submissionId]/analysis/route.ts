@@ -1,13 +1,22 @@
 import { NextResponse } from 'next/server';
 import { requireUserContext } from '@/lib/auth/user';
 import { uuidParam } from '@/lib/validators/path-params';
-import { toErrorResponse } from '@/lib/http/errors';
+import { HttpError, toErrorResponse } from '@/lib/http/errors';
 
 export async function GET(request: Request, context: { params: Promise<{ submissionId: string }> }) {
   try {
     const { userId, supabase } = await requireUserContext(request);
     const { submissionId: rawSubmissionId } = await context.params;
     const submissionId = uuidParam.parse(rawSubmissionId);
+
+    const { data: submission, error: subErr } = await supabase
+      .from('submissions')
+      .select('status, failure_reason, original_text')
+      .eq('id', submissionId)
+      .eq('user_id', userId)
+      .maybeSingle();
+    if (subErr) throw subErr;
+    if (!submission) throw new HttpError(404, 'not_found');
 
     const { data: analysis, error: analysisError } = await supabase
       .from('analyses')
@@ -34,6 +43,9 @@ export async function GET(request: Request, context: { params: Promise<{ submiss
     if (cardsError) throw cardsError;
 
     return NextResponse.json({
+      status: submission.status,
+      failureReason: submission.failure_reason,
+      originalText: submission.original_text,
       correctedText: analysis?.corrected_text ?? null,
       summary: analysis?.summary ?? null,
       issues: (issues ?? []).map((issue) => ({
