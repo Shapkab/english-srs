@@ -3,6 +3,7 @@ export type ClozeSegment =
   | { kind: 'cloze'; clozeNumber: number; answer: string };
 
 const ATOM_START_RE = /\{\{c(\d+)::/;
+const MAX_CLOZE_NUMBER = 99;
 
 export function parseCloze(input: string): ClozeSegment[] {
   if (input.length === 0) return [];
@@ -34,6 +35,12 @@ export function parseCloze(input: string): ClozeSegment[] {
     }
 
     const clozeNumber = Number.parseInt(atomMatch[1], 10);
+    if (!Number.isFinite(clozeNumber) || clozeNumber < 1 || clozeNumber > MAX_CLOZE_NUMBER) {
+      pushText(segments, input.slice(atomStart, closeIdx + 2));
+      cursor = closeIdx + 2;
+      continue;
+    }
+
     const answer = input.slice(innerStart, closeIdx);
     segments.push({ kind: 'cloze', clozeNumber, answer });
 
