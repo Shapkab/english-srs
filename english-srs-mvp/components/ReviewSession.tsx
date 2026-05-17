@@ -2,7 +2,7 @@
 
 import Link from 'next/link';
 import type { Route } from 'next';
-import { useCallback, useEffect, useReducer, useRef } from 'react';
+import { useCallback, useEffect, useReducer, useRef, useState } from 'react';
 import ReviewCard from '@/components/ReviewCard';
 import { fetchWithAuth } from '@/lib/api/client';
 import { toUserMessage, type ErrorPayload } from '@/lib/api/error-messages';
@@ -41,6 +41,9 @@ export default function ReviewSession() {
   const doneLoggedRef = useRef(false);
   const emptyLoggedRef = useRef(false);
   const submittingRef = useRef(false);
+  const [showShortcuts, setShowShortcuts] = useState(false);
+  const showShortcutsRef = useRef(showShortcuts);
+  showShortcutsRef.current = showShortcuts;
 
   const fetchQueue = useCallback(async () => {
     dispatch({ type: 'fetch_started' });
@@ -123,6 +126,20 @@ export default function ReviewSession() {
   // Keyboard handler.
   useEffect(() => {
     function onKey(event: KeyboardEvent) {
+      if (event.key === '?') {
+        event.preventDefault();
+        setShowShortcuts((v) => !v);
+        return;
+      }
+      if (event.key === 'Escape') {
+        if (showShortcutsRef.current) {
+          event.preventDefault();
+          setShowShortcuts(false);
+        }
+        return;
+      }
+      if (showShortcutsRef.current) return;
+
       const phase = stateRef.current.phase;
       if (event.key === ' ' || event.key === 'Enter') {
         if (phase.kind === 'showing_question') {
@@ -179,13 +196,42 @@ export default function ReviewSession() {
     dispatch({ type: 'retry_rating', now: Date.now() });
   }, []);
 
-  return renderPhase(state.phase, {
-    onReveal: handleReveal,
-    onRate: handleRate,
-    onSuspended: handleSuspended,
-    onRetry: handleRetry,
-    onTryAgain: () => dispatch({ type: 'try_again_after_queue_error' }),
-  });
+  return (
+    <>
+      {renderPhase(state.phase, {
+        onReveal: handleReveal,
+        onRate: handleRate,
+        onSuspended: handleSuspended,
+        onRetry: handleRetry,
+        onTryAgain: () => dispatch({ type: 'try_again_after_queue_error' }),
+      })}
+      {showShortcuts && (
+        <div
+          className="shortcuts-overlay"
+          role="dialog"
+          aria-modal="true"
+          aria-label="Keyboard shortcuts"
+          onClick={() => setShowShortcuts(false)}
+        >
+          <div
+            className="shortcuts-overlay__panel"
+            onClick={(e) => e.stopPropagation()}
+          >
+            <h3>Keyboard shortcuts</h3>
+            <dl>
+              <dt>Space / Enter</dt><dd>Reveal answer</dd>
+              <dt>1</dt><dd>Again</dd>
+              <dt>2</dt><dd>Hard</dd>
+              <dt>3</dt><dd>Good</dd>
+              <dt>4</dt><dd>Easy</dd>
+              <dt>?</dt><dd>Toggle this panel</dd>
+              <dt>Esc</dt><dd>Close this panel</dd>
+            </dl>
+          </div>
+        </div>
+      )}
+    </>
+  );
 }
 
 interface RenderHandlers {

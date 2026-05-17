@@ -116,3 +116,10 @@ code, pre {
 .feedback-menu__option:hover:not(:disabled) { background: #f3f4f6; }
 .feedback-menu__option:disabled { opacity: 0.5; cursor: not-allowed; }
 .feedback-menu__error { padding: 8px; display: grid; gap: 6px; }
+.dashboard-head__actions { display: flex; gap: 8px; align-items: center; }
+.shortcuts-overlay { position: fixed; inset: 0; display: flex; align-items: center; justify-content: center; background: rgba(17,24,39,0.4); z-index: 50; }
+.shortcuts-overlay__panel { background: white; border: 1px solid #e5e7eb; border-radius: 12px; padding: 20px 24px; min-width: 280px; display: grid; gap: 8px; }
+.shortcuts-overlay__panel h3 { margin: 0 0 8px; font-size: 16px; }
+.shortcuts-overlay__panel dl { display: grid; grid-template-columns: auto 1fr; gap: 6px 16px; margin: 0; font-size: 13px; }
+.shortcuts-overlay__panel dt { font-family: Menlo, Monaco, Consolas, monospace; background: #f3f4f6; padding: 2px 6px; border-radius: 4px; }
+.shortcuts-overlay__panel dd { margin: 0; color: #374151; }
