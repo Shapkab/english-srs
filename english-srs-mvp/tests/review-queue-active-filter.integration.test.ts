@@ -69,11 +69,29 @@ suite('GET /api/v1/review-queue cards.status=active filter (H5)', () => {
 
     const sharedDueAt = new Date(Date.now() - 60_000).toISOString();
 
+    // Seed a real submission per card so the unique index on
+    // (user_id, learning_target_id, source_submission_id, card_type) with
+    // NULLS NOT DISTINCT does not collide on two NULL source_submission_id
+    // rows under the same target/type.
+    async function seedSubmission(label: string): Promise<string> {
+      const { data, error } = await admin
+        .from('submissions')
+        .insert({ user_id: userId, source_type: 'text', original_text: `seed ${label} ${suffix()}` })
+        .select('id')
+        .single();
+      if (error || !data) throw error ?? new Error('seed submission failed');
+      return data.id as string;
+    }
+
+    const activeSubmissionId = await seedSubmission('active');
+    const suspendedSubmissionId = await seedSubmission('suspended');
+
     const { data: cardActive, error: cardActiveErr } = await admin
       .from('cards')
       .insert({
         user_id: userId,
         learning_target_id: learningTargetId,
+        source_submission_id: activeSubmissionId,
         card_type: 'correction',
         front: 'active card front',
         back: 'went',
@@ -89,6 +107,7 @@ suite('GET /api/v1/review-queue cards.status=active filter (H5)', () => {
       .insert({
         user_id: userId,
         learning_target_id: learningTargetId,
+        source_submission_id: suspendedSubmissionId,
         card_type: 'correction',
         front: 'suspended card front',
         back: 'went',
@@ -135,6 +154,7 @@ suite('GET /api/v1/review-queue cards.status=active filter (H5)', () => {
         await admin.from('learning_targets').delete().eq('id', learningTargetId);
       }
       if (userId) {
+        await admin.from('submissions').delete().eq('user_id', userId);
         await admin.from('users_profile').delete().eq('id', userId);
         await admin.auth.admin.deleteUser(userId);
       }

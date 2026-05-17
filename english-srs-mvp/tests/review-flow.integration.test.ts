@@ -40,11 +40,28 @@ suite('/review end-to-end flow (route handlers + DB)', () => {
 
   async function seedCard(opts: { back: string; status?: 'active' | 'suspended' }): Promise<SeededCard> {
     const { back, status = 'active' } = opts;
+
+    // Each card needs a distinct source_submission_id so the unique index
+    // on (user_id, learning_target_id, source_submission_id, card_type)
+    // with NULLS NOT DISTINCT does not collide on a second seedCard call
+    // for the same target/type.
+    const { data: subRow, error: subErr } = await admin
+      .from('submissions')
+      .insert({
+        user_id: userId,
+        source_type: 'text',
+        original_text: `seed source ${suffix()}`,
+      })
+      .select('id')
+      .single();
+    if (subErr || !subRow) throw subErr ?? new Error('seed source submission failed');
+
     const { data: cardRow, error: cardErr } = await admin
       .from('cards')
       .insert({
         user_id: userId,
         learning_target_id: learningTargetId,
+        source_submission_id: subRow.id as string,
         card_type: 'correction',
         front: `front-${suffix()}`,
         back,
@@ -138,6 +155,7 @@ suite('/review end-to-end flow (route handlers + DB)', () => {
         await admin.from('learning_targets').delete().eq('id', learningTargetId);
       }
       if (userId) {
+        await admin.from('submissions').delete().eq('user_id', userId);
         await admin.from('users_profile').delete().eq('id', userId);
         await admin.auth.admin.deleteUser(userId);
       }
