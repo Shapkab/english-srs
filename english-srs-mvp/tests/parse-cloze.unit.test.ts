@@ -67,4 +67,18 @@ describe('parseCloze', () => {
   it('returns [] for empty input', () => {
     expect(parseCloze('')).toEqual([]);
   });
+
+  it('still parses c99 (cap is inclusive)', () => {
+    expect(parseCloze('blank: {{c99::Z}} done')).toEqual([
+      { kind: 'text', value: 'blank: ' },
+      { kind: 'cloze', clozeNumber: 99, answer: 'Z' },
+      { kind: 'text', value: ' done' },
+    ]);
+  });
+
+  it('falls back to text for clozeNumber above the cap (100)', () => {
+    expect(parseCloze('before {{c100::Z}} after')).toEqual([
+      { kind: 'text', value: 'before {{c100::Z}} after' },
+    ]);
+  });
 });

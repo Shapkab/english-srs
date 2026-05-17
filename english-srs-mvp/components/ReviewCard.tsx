@@ -50,7 +50,11 @@ export default function ReviewCard({
         <span className="review-progress">
           Card {progress.current} of {progress.total}
         </span>
-        <CardFeedbackMenu cardId={card.cardId} onSuspended={onSuspended} />
+        <CardFeedbackMenu
+          key={card.cardId}
+          cardId={card.cardId}
+          onSuspended={onSuspended}
+        />
       </div>
 
       <div className="review-stage__prompt">

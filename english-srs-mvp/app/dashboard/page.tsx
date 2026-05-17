@@ -114,7 +114,7 @@ export default function DashboardPage() {
             rows={4}
             required
           />
-          {error && <p className="auth-error">Submit failed: {error}</p>}
+          {error && <p className="auth-error">{error}</p>}
           <button type="submit" className="btn" disabled={submitting || text.trim().length === 0}>
             {submitting ? 'Submitting…' : 'Submit'}
           </button>
