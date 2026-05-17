@@ -53,6 +53,7 @@ export interface ReviewQueueItem {
   cardId: string;
   cardType: CardType;
   front: string;
+  back: string;
   hint: string | null;
   dueAt: string;
 }

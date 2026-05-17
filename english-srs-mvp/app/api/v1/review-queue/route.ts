@@ -7,6 +7,7 @@ const relatedCardSchema = z.object({
   id: z.string().uuid(),
   card_type: z.string(),
   front: z.string(),
+  back: z.string(),
   hint: z.string().nullable(),
   status: z.string(),
 });
@@ -23,7 +24,7 @@ export async function GET(request: Request) {
     const now = new Date().toISOString();
     const { data, error } = await supabase
       .from('srs_state')
-      .select('due_at, cards!inner(id, card_type, front, hint, status)')
+      .select('due_at, cards!inner(id, card_type, front, back, hint, status)')
       .eq('user_id', userId)
       .eq('cards.status', 'active')
       .lte('due_at', now)
@@ -39,6 +40,7 @@ export async function GET(request: Request) {
         cardId: card!.id,
         cardType: card!.card_type,
         front: card!.front,
+        back: card!.back,
         hint: card!.hint,
         dueAt: row.due_at,
       };
