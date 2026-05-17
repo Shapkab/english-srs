@@ -1,6 +1,6 @@
 'use client';
 
-import { useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { fetchWithAuth } from '@/lib/api/client';
 import { toUserMessage, type ErrorPayload } from '@/lib/api/error-messages';
 import { trackEvent } from '@/lib/analytics/events';
@@ -32,6 +32,18 @@ export default function CardFeedbackMenu({ cardId, onSuspended }: CardFeedbackMe
   const [pendingType, setPendingType] = useState<FeedbackType | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [lastAttempt, setLastAttempt] = useState<FeedbackOption | null>(null);
+  const containerRef = useRef<HTMLDivElement>(null);
+
+  useEffect(() => {
+    if (!open) return;
+    function onMouseDown(event: MouseEvent) {
+      if (!containerRef.current) return;
+      if (containerRef.current.contains(event.target as Node)) return;
+      setOpen(false);
+    }
+    document.addEventListener('mousedown', onMouseDown);
+    return () => document.removeEventListener('mousedown', onMouseDown);
+  }, [open]);
 
   async function submit(option: FeedbackOption) {
     setError(null);
@@ -68,7 +80,7 @@ export default function CardFeedbackMenu({ cardId, onSuspended }: CardFeedbackMe
   }
 
   return (
-    <div className="feedback-menu">
+    <div className="feedback-menu" ref={containerRef}>
       <button
         type="button"
         className="feedback-menu__trigger"
