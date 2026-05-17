@@ -151,9 +151,14 @@ suite('GET /api/v1/review-queue cards.status=active filter (H5)', () => {
     const res = await reviewQueueGet(req);
     expect(res.status).toBe(200);
 
-    const body = (await res.json()) as { cards: Array<{ cardId: string }> };
+    const body = (await res.json()) as {
+      cards: Array<{ cardId: string; back: string }>;
+    };
     const returnedIds = new Set(body.cards.map((c) => c.cardId));
     expect(returnedIds.has(activeCardId)).toBe(true);
     expect(returnedIds.has(suspendedCardId)).toBe(false);
+
+    const returnedActive = body.cards.find((c) => c.cardId === activeCardId);
+    expect(returnedActive?.back).toBe('went');
   });
 });

@@ -1,5 +1,6 @@
 'use client';
 
+import Link from 'next/link';
 import type { Route } from 'next';
 import { useRouter } from 'next/navigation';
 import { useEffect, useState, type FormEvent } from 'react';
@@ -9,6 +10,7 @@ import { toUserMessage, type ErrorPayload } from '@/lib/api/error-messages';
 import { getBrowserSupabase } from '@/lib/supabase/browser';
 
 const LOGIN_ROUTE = '/login' as Route;
+const REVIEW_ROUTE = '/review' as Route;
 
 export default function DashboardPage() {
   const router = useRouter();
@@ -17,6 +19,7 @@ export default function DashboardPage() {
   const [submitting, setSubmitting] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [refreshKey, setRefreshKey] = useState(0);
+  const [dueCount, setDueCount] = useState<number | null>(null);
 
   useEffect(() => {
     const supabase = getBrowserSupabase();
@@ -35,6 +38,25 @@ export default function DashboardPage() {
       cancelled = true;
     };
   }, [router]);
+
+  useEffect(() => {
+    if (!authChecked) return;
+    let cancelled = false;
+    async function loadDueCount() {
+      try {
+        const res = await fetchWithAuth('/api/v1/review-queue');
+        if (!res.ok) return;
+        const body = (await res.json()) as { cards: unknown[] };
+        if (!cancelled) setDueCount(body.cards.length);
+      } catch {
+        // nice-to-have; ignore failures
+      }
+    }
+    void loadDueCount();
+    return () => {
+      cancelled = true;
+    };
+  }, [authChecked]);
 
   async function onSubmit(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
@@ -71,7 +93,14 @@ export default function DashboardPage() {
     <main className="dashboard-shell">
       <header className="dashboard-head">
         <h1>English SRS</h1>
-        <button type="button" className="btn-ghost" onClick={onSignOut}>Sign out</button>
+        <div className="dashboard-head__actions">
+          {dueCount !== null && dueCount > 0 && (
+            <Link href={REVIEW_ROUTE} className="btn-ghost">
+              Review ({dueCount} due) →
+            </Link>
+          )}
+          <button type="button" className="btn-ghost" onClick={onSignOut}>Sign out</button>
+        </div>
       </header>
 
       <section className="card">
