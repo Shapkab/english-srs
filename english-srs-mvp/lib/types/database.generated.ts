@@ -245,11 +245,11 @@ export type Database = {
         }
         Relationships: [
           {
-            foreignKeyName: "cards_learning_target_id_fkey"
-            columns: ["learning_target_id"]
+            foreignKeyName: "cards_learning_target_id_user_id_fkey"
+            columns: ["learning_target_id", "user_id"]
             isOneToOne: false
             referencedRelation: "learning_targets"
-            referencedColumns: ["id"]
+            referencedColumns: ["id", "user_id"]
           },
           {
             foreignKeyName: "cards_source_submission_id_fkey"
@@ -367,7 +367,6 @@ export type Database = {
       }
       learning_targets: {
         Row: {
-          active_card_count: number
           canonical_key: string
           category: string
           created_at: string
@@ -376,7 +375,6 @@ export type Database = {
           first_seen_at: string
           id: string
           last_seen_at: string
-          mastery_score: number
           seen_count: number
           status: string
           subcategory: string | null
@@ -384,7 +382,6 @@ export type Database = {
           user_id: string
         }
         Insert: {
-          active_card_count?: number
           canonical_key: string
           category: string
           created_at?: string
@@ -393,7 +390,6 @@ export type Database = {
           first_seen_at?: string
           id?: string
           last_seen_at?: string
-          mastery_score?: number
           seen_count?: number
           status?: string
           subcategory?: string | null
@@ -401,7 +397,6 @@ export type Database = {
           user_id: string
         }
         Update: {
-          active_card_count?: number
           canonical_key?: string
           category?: string
           created_at?: string
@@ -410,7 +405,6 @@ export type Database = {
           first_seen_at?: string
           id?: string
           last_seen_at?: string
-          mastery_score?: number
           seen_count?: number
           status?: string
           subcategory?: string | null
