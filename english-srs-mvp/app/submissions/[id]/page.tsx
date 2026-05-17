@@ -5,6 +5,7 @@ import type { Route } from 'next';
 import { useRouter } from 'next/navigation';
 import { use, useEffect, useState } from 'react';
 import { fetchWithAuth } from '@/lib/api/client';
+import { toUserMessage, type ErrorPayload } from '@/lib/api/error-messages';
 import { getBrowserSupabase } from '@/lib/supabase/browser';
 
 const LOGIN_ROUTE = '/login' as Route;
@@ -27,6 +28,9 @@ interface CardCreated {
 }
 
 interface AnalysisResponse {
+  status: 'pending' | 'analyzed' | 'failed';
+  failureReason: string | null;
+  originalText: string;
   correctedText: string | null;
   summary: string | null;
   issues: Issue[];
@@ -40,6 +44,8 @@ export default function SubmissionDetailPage({ params }: { params: Promise<{ id:
   const [authChecked, setAuthChecked] = useState(false);
   const [analysis, setAnalysis] = useState<AnalysisResponse | null>(null);
   const [error, setError] = useState<string | null>(null);
+  const [retrying, setRetrying] = useState(false);
+  const [retryError, setRetryError] = useState<string | null>(null);
 
   useEffect(() => {
     const supabase = getBrowserSupabase();
@@ -69,13 +75,14 @@ export default function SubmissionDetailPage({ params }: { params: Promise<{ id:
       try {
         const res = await fetchWithAuth(`/api/v1/submissions/${id}/analysis`);
         if (!res.ok) {
-          const body = (await res.json().catch(() => ({}))) as { code?: string };
-          throw new Error(body.code ?? `HTTP ${res.status}`);
+          const body = (await res.json().catch(() => ({}))) as ErrorPayload;
+          throw new Error(toUserMessage(body, res.status));
         }
         const body = (await res.json()) as AnalysisResponse;
         if (cancelled) return;
         setAnalysis(body);
-        if (body.correctedText !== null && timer !== null) {
+        const isTerminal = body.status === 'analyzed' || body.status === 'failed';
+        if (isTerminal && timer !== null) {
           clearInterval(timer);
           timer = null;
         }
@@ -98,7 +105,54 @@ export default function SubmissionDetailPage({ params }: { params: Promise<{ id:
     };
   }, [authChecked, id]);
 
+  async function onRetry() {
+    if (!analysis) return;
+    setRetryError(null);
+    setRetrying(true);
+    try {
+      const res = await fetchWithAuth('/api/v1/submissions', {
+        method: 'POST',
+        body: JSON.stringify({ text: analysis.originalText }),
+      });
+      if (!res.ok) {
+        const body = (await res.json().catch(() => ({}))) as ErrorPayload;
+        throw new Error(toUserMessage(body, res.status));
+      }
+      const body = (await res.json()) as { submissionId: string };
+      router.replace(`/submissions/${body.submissionId}` as Route);
+    } catch (e) {
+      setRetryError(e instanceof Error ? e.message : String(e));
+    } finally {
+      setRetrying(false);
+    }
+  }
+
   if (!authChecked) return <main className="dashboard-shell"><p className="muted">Loading…</p></main>;
+
+  if (analysis?.status === 'failed') {
+    return (
+      <main className="dashboard-shell">
+        <header className="dashboard-head">
+          <h1>Submission</h1>
+          <Link href={DASHBOARD_ROUTE} className="btn-ghost">← Back to dashboard</Link>
+        </header>
+        <section className="card">
+          <h2>This submission couldn&apos;t be analyzed</h2>
+          <p className="muted">
+            {analysis.failureReason ?? "We don't have a specific reason logged."}
+          </p>
+          <details>
+            <summary>What you submitted</summary>
+            <pre className="muted">{analysis.originalText}</pre>
+          </details>
+          <button type="button" className="btn" onClick={onRetry} disabled={retrying}>
+            {retrying ? 'Retrying…' : 'Retry with the same text'}
+          </button>
+          {retryError && <p className="auth-error">{retryError}</p>}
+        </section>
+      </main>
+    );
+  }
 
   const ready = analysis !== null && analysis.correctedText !== null;
 

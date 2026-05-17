@@ -5,6 +5,7 @@ import { useRouter } from 'next/navigation';
 import { useEffect, useState, type FormEvent } from 'react';
 import SubmissionsList from '@/components/SubmissionsList';
 import { fetchWithAuth } from '@/lib/api/client';
+import { toUserMessage, type ErrorPayload } from '@/lib/api/error-messages';
 import { getBrowserSupabase } from '@/lib/supabase/browser';
 
 const LOGIN_ROUTE = '/login' as Route;
@@ -46,8 +47,8 @@ export default function DashboardPage() {
         body: JSON.stringify({ text }),
       });
       if (!res.ok) {
-        const body = (await res.json().catch(() => ({}))) as { code?: string };
-        throw new Error(body.code ?? `HTTP ${res.status}`);
+        const body = (await res.json().catch(() => ({}))) as ErrorPayload;
+        throw new Error(toUserMessage(body, res.status));
       }
       const body = (await res.json()) as { submissionId: string };
       router.push(`/submissions/${body.submissionId}` as Route);
