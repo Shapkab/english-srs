@@ -69,11 +69,29 @@ suite('GET /api/v1/review-queue cards.status=active filter (H5)', () => {
 
     const sharedDueAt = new Date(Date.now() - 60_000).toISOString();
 
+    // Seed a real submission per card so the unique index on
+    // (user_id, learning_target_id, source_submission_id, card_type) with
+    // NULLS NOT DISTINCT does not collide on two NULL source_submission_id
+    // rows under the same target/type.
+    async function seedSubmission(label: string): Promise<string> {
+      const { data, error } = await admin
+        .from('submissions')
+        .insert({ user_id: userId, source_type: 'text', original_text: `seed ${label} ${suffix()}` })
+        .select('id')
+        .single();
+      if (error || !data) throw error ?? new Error('seed submission failed');
+      return data.id as string;
+    }
+
+    const activeSubmissionId = await seedSubmission('active');
+    const suspendedSubmissionId = await seedSubmission('suspended');
+
     const { data: cardActive, error: cardActiveErr } = await admin
       .from('cards')
       .insert({
         user_id: userId,
         learning_target_id: learningTargetId,
+        source_submission_id: activeSubmissionId,
         card_type: 'correction',
         front: 'active card front',
         back: 'went',
@@ -89,6 +107,7 @@ suite('GET /api/v1/review-queue cards.status=active filter (H5)', () => {
       .insert({
         user_id: userId,
         learning_target_id: learningTargetId,
+        source_submission_id: suspendedSubmissionId,
         card_type: 'correction',
         front: 'suspended card front',
         back: 'went',
@@ -135,6 +154,7 @@ suite('GET /api/v1/review-queue cards.status=active filter (H5)', () => {
         await admin.from('learning_targets').delete().eq('id', learningTargetId);
       }
       if (userId) {
+        await admin.from('submissions').delete().eq('user_id', userId);
         await admin.from('users_profile').delete().eq('id', userId);
         await admin.auth.admin.deleteUser(userId);
       }
@@ -160,5 +180,115 @@ suite('GET /api/v1/review-queue cards.status=active filter (H5)', () => {
 
     const returnedActive = body.cards.find((c) => c.cardId === activeCardId);
     expect(returnedActive?.back).toBe('went');
+  });
+
+  it('orders same-due cards by priority desc as a secondary sort', async () => {
+    // Seed two same-due cards under fresh learning_targets so each gets a
+    // distinct (learning_target_id, source_submission_id) tuple and the
+    // NULLS-NOT-DISTINCT unique index does not collide.
+    const sharedDueAt = new Date(Date.now() - 120_000).toISOString();
+
+    const { data: ltLow } = await admin
+      .from('learning_targets')
+      .insert({
+        user_id: userId,
+        canonical_key: `priority-lo-${suffix()}`,
+        display_title: 'priority low seed',
+        category: 'tense',
+        subcategory: 'past simple',
+        explanation_short: 'lo',
+      })
+      .select('id')
+      .single();
+    const { data: ltHigh } = await admin
+      .from('learning_targets')
+      .insert({
+        user_id: userId,
+        canonical_key: `priority-hi-${suffix()}`,
+        display_title: 'priority high seed',
+        category: 'tense',
+        subcategory: 'past simple',
+        explanation_short: 'hi',
+      })
+      .select('id')
+      .single();
+    const { data: subLo } = await admin
+      .from('submissions')
+      .insert({ user_id: userId, source_type: 'text', original_text: `prio-lo ${suffix()}` })
+      .select('id')
+      .single();
+    const { data: subHi } = await admin
+      .from('submissions')
+      .insert({ user_id: userId, source_type: 'text', original_text: `prio-hi ${suffix()}` })
+      .select('id')
+      .single();
+
+    const { data: cardLow } = await admin
+      .from('cards')
+      .insert({
+        user_id: userId,
+        learning_target_id: ltLow!.id,
+        source_submission_id: subLo!.id,
+        card_type: 'correction',
+        front: 'low pri',
+        back: 'lo',
+        status: 'active',
+        priority: 10,
+      })
+      .select('id')
+      .single();
+    const { data: cardHigh } = await admin
+      .from('cards')
+      .insert({
+        user_id: userId,
+        learning_target_id: ltHigh!.id,
+        source_submission_id: subHi!.id,
+        card_type: 'correction',
+        front: 'high pri',
+        back: 'hi',
+        status: 'active',
+        priority: 90,
+      })
+      .select('id')
+      .single();
+    await admin.from('srs_state').insert([
+      {
+        card_id: cardLow!.id,
+        user_id: userId,
+        repetition: 0,
+        interval_days: 0,
+        ease_factor: 2.5,
+        due_at: sharedDueAt,
+        lapse_count: 0,
+      },
+      {
+        card_id: cardHigh!.id,
+        user_id: userId,
+        repetition: 0,
+        interval_days: 0,
+        ease_factor: 2.5,
+        due_at: sharedDueAt,
+        lapse_count: 0,
+      },
+    ]);
+
+    const req = new Request('http://localhost/api/v1/review-queue', {
+      method: 'GET',
+      headers: { authorization: `Bearer ${accessToken}` },
+    });
+    const res = await reviewQueueGet(req);
+    expect(res.status).toBe(200);
+    const body = (await res.json()) as { cards: Array<{ cardId: string }> };
+    const hi = body.cards.findIndex((c) => c.cardId === cardHigh!.id);
+    const lo = body.cards.findIndex((c) => c.cardId === cardLow!.id);
+    expect(hi).toBeGreaterThanOrEqual(0);
+    expect(lo).toBeGreaterThanOrEqual(0);
+    expect(hi).toBeLessThan(lo);
+
+    // Cleanup the two extra cards + state + targets + submissions.
+    await admin.from('srs_state').delete().in('card_id', [cardLow!.id, cardHigh!.id]);
+    await admin.from('cards').delete().in('id', [cardLow!.id, cardHigh!.id]);
+    await admin.from('learning_targets').delete().in('id', [ltLow!.id, ltHigh!.id]);
+    await admin.from('submissions').delete().in('id', [subLo!.id, subHi!.id]);
   });
 });

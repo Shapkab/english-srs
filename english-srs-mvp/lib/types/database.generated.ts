@@ -245,11 +245,11 @@ export type Database = {
         }
         Relationships: [
           {
-            foreignKeyName: "cards_learning_target_id_fkey"
-            columns: ["learning_target_id"]
+            foreignKeyName: "cards_learning_target_id_user_id_fkey"
+            columns: ["learning_target_id", "user_id"]
             isOneToOne: false
             referencedRelation: "learning_targets"
-            referencedColumns: ["id"]
+            referencedColumns: ["id", "user_id"]
           },
           {
             foreignKeyName: "cards_source_submission_id_fkey"
@@ -367,7 +367,6 @@ export type Database = {
       }
       learning_targets: {
         Row: {
-          active_card_count: number
           canonical_key: string
           category: string
           created_at: string
@@ -376,7 +375,7 @@ export type Database = {
           first_seen_at: string
           id: string
           last_seen_at: string
-          mastery_score: number
+          merged_into_id: string | null
           seen_count: number
           status: string
           subcategory: string | null
@@ -384,7 +383,6 @@ export type Database = {
           user_id: string
         }
         Insert: {
-          active_card_count?: number
           canonical_key: string
           category: string
           created_at?: string
@@ -393,7 +391,7 @@ export type Database = {
           first_seen_at?: string
           id?: string
           last_seen_at?: string
-          mastery_score?: number
+          merged_into_id?: string | null
           seen_count?: number
           status?: string
           subcategory?: string | null
@@ -401,7 +399,6 @@ export type Database = {
           user_id: string
         }
         Update: {
-          active_card_count?: number
           canonical_key?: string
           category?: string
           created_at?: string
@@ -410,7 +407,7 @@ export type Database = {
           first_seen_at?: string
           id?: string
           last_seen_at?: string
-          mastery_score?: number
+          merged_into_id?: string | null
           seen_count?: number
           status?: string
           subcategory?: string | null
@@ -418,6 +415,13 @@ export type Database = {
           user_id?: string
         }
         Relationships: [
+          {
+            foreignKeyName: "learning_targets_merged_into_id_user_id_fkey"
+            columns: ["merged_into_id", "user_id"]
+            isOneToOne: false
+            referencedRelation: "learning_targets"
+            referencedColumns: ["id", "user_id"]
+          },
           {
             foreignKeyName: "learning_targets_user_id_fkey"
             columns: ["user_id"]
@@ -634,6 +638,10 @@ export type Database = {
       }
       mark_submission_failed: {
         Args: { p_reason: string; p_submission_id: string; p_user_id: string }
+        Returns: undefined
+      }
+      merge_learning_targets: {
+        Args: { p_from_id: string; p_into_id: string; p_user_id: string }
         Returns: undefined
       }
       persist_submission_analysis: {

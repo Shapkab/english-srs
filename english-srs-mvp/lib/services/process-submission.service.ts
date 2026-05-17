@@ -2,6 +2,7 @@ import { getSupabaseAdmin } from '@/lib/db/server';
 import { analyzeSubmissionText } from '@/lib/services/analysis.service';
 import { normalizeIssueToLearningTarget } from '@/lib/normalization/normalize-issue';
 import { generateCardCandidates } from '@/lib/services/card-generation.service';
+import { ANALYSIS_SCHEMA_VERSION } from '@/lib/openai/schema-version';
 import type { CardCandidate } from '@/lib/types/domain';
 
 interface PersistedRow {
@@ -56,7 +57,7 @@ export async function processSubmission(params: { submissionId: string; userId: 
     p_model: process.env.OPENAI_MODEL_ANALYSIS ?? 'gpt-4.1-mini',
     p_corrected_text: analysis.correctedText,
     p_summary: analysis.summary,
-    p_schema_version: '1.0.0',
+    p_schema_version: ANALYSIS_SCHEMA_VERSION,
     p_issues: analysis.issues,
     p_normalized_targets: normalizedTargets,
     p_card_candidates: cardCandidates,
