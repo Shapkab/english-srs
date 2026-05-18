@@ -56,4 +56,11 @@ export interface ReviewQueueItem {
   back: string;
   hint: string | null;
   dueAt: string;
+  learningTarget: {
+    id: string;
+    title: string;
+    category: string;
+    seenCount: number;
+    masteryLevel: number;
+  } | null;
 }

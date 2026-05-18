@@ -15,6 +15,7 @@ function card(id: string, label = id): ReviewQueueItem {
     back: `back-${label}`,
     hint: null,
     dueAt: new Date(Date.now() - 1000).toISOString(),
+    learningTarget: null,
   };
 }
 

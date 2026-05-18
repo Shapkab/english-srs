@@ -11,7 +11,7 @@ export async function GET(request: Request, context: { params: Promise<{ submiss
 
     const { data: submission, error: subErr } = await supabase
       .from('submissions')
-      .select('status, failure_reason, original_text')
+      .select('id, status, failure_reason, original_text, created_at')
       .eq('id', submissionId)
       .eq('user_id', userId)
       .maybeSingle();
@@ -28,36 +28,120 @@ export async function GET(request: Request, context: { params: Promise<{ submiss
 
     const { data: issues, error: issuesError } = await supabase
       .from('analysis_issues')
-      .select('id, category, error_text, corrected_text, explanation_short, confidence, should_create_card')
+      .select(
+        'id, category, subcategory, error_text, corrected_text, explanation_short, confidence, severity, should_create_card, created_at',
+      )
       .eq('submission_id', submissionId)
       .eq('user_id', userId)
       .order('created_at', { ascending: true });
     if (issuesError) throw issuesError;
 
+    const issueIds = (issues ?? []).map((i) => i.id);
+    let evidenceByIssue: Record<string, { ltId: string }> = {};
+    let ltById: Record<
+      string,
+      {
+        id: string;
+        title: string;
+        category: string;
+        seenCount: number;
+        firstSeenAt: string;
+        masteryLevel: number;
+      }
+    > = {};
+    if (issueIds.length > 0) {
+      const { data: evidence, error: evErr } = await supabase
+        .from('learning_target_evidence')
+        .select('analysis_issue_id, learning_target_id')
+        .in('analysis_issue_id', issueIds)
+        .eq('user_id', userId);
+      if (evErr) throw evErr;
+      for (const e of evidence ?? []) {
+        evidenceByIssue[e.analysis_issue_id] = { ltId: e.learning_target_id };
+      }
+      const ltIds = Array.from(new Set(Object.values(evidenceByIssue).map((v) => v.ltId)));
+      if (ltIds.length > 0) {
+        const { data: lts, error: ltErr } = await supabase
+          .from('learning_targets')
+          .select('id, display_title, category, seen_count, first_seen_at')
+          .in('id', ltIds)
+          .eq('user_id', userId);
+        if (ltErr) throw ltErr;
+        for (const t of lts ?? []) {
+          ltById[t.id] = {
+            id: t.id,
+            title: t.display_title,
+            category: t.category,
+            seenCount: t.seen_count ?? 1,
+            firstSeenAt: t.first_seen_at,
+            masteryLevel: 0,
+          };
+        }
+      }
+    }
+
     const { data: cards, error: cardsError } = await supabase
       .from('cards')
-      .select('id, front, back')
+      .select('id, front, back, hint, card_type, status, learning_target_id, created_at')
       .eq('source_submission_id', submissionId)
       .eq('user_id', userId)
       .order('created_at', { ascending: true });
     if (cardsError) throw cardsError;
 
+    const submissionCreatedAt = submission.created_at;
+
     return NextResponse.json({
       status: submission.status,
       failureReason: submission.failure_reason,
       originalText: submission.original_text,
+      createdAt: submission.created_at,
       correctedText: analysis?.corrected_text ?? null,
       summary: analysis?.summary ?? null,
-      issues: (issues ?? []).map((issue) => ({
-        id: issue.id,
-        category: issue.category,
-        errorText: issue.error_text,
-        correctedText: issue.corrected_text,
-        explanationShort: issue.explanation_short,
-        confidence: issue.confidence,
-        shouldCreateCard: issue.should_create_card,
+      issues: (issues ?? []).map((issue) => {
+        const ev = evidenceByIssue[issue.id];
+        const lt = ev ? ltById[ev.ltId] : null;
+        const isNew = lt ? lt.firstSeenAt >= submissionCreatedAt : false;
+        const mergedOccurrences = lt && lt.seenCount > 1 ? lt.seenCount : null;
+        const linkKind: 'created' | 'promoted' | 'merged' | null = lt
+          ? isNew
+            ? 'created'
+            : mergedOccurrences && mergedOccurrences > 1
+              ? 'merged'
+              : 'promoted'
+          : null;
+        return {
+          id: issue.id,
+          category: issue.category,
+          subcategory: issue.subcategory,
+          errorText: issue.error_text,
+          correctedText: issue.corrected_text,
+          explanationShort: issue.explanation_short,
+          confidence: issue.confidence,
+          severity: issue.severity,
+          shouldCreateCard: issue.should_create_card,
+          learningTarget: lt
+            ? {
+                id: lt.id,
+                title: lt.title,
+                category: lt.category,
+                masteryLevel: lt.masteryLevel,
+                seenCount: lt.seenCount,
+                linkKind,
+                mergedOccurrences,
+              }
+            : null,
+        };
+      }),
+      cardsCreated: (cards ?? []).map((c) => ({
+        id: c.id,
+        front: c.front,
+        back: c.back,
+        hint: c.hint,
+        cardType: c.card_type,
+        status: c.status,
+        learningTargetId: c.learning_target_id,
+        learningTarget: c.learning_target_id ? ltById[c.learning_target_id] ?? null : null,
       })),
-      cardsCreated: cards ?? [],
     });
   } catch (error) {
     return toErrorResponse(error, request);

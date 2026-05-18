@@ -3,6 +3,13 @@ import { z } from 'zod';
 import { requireUserContext } from '@/lib/auth/user';
 import { toErrorResponse } from '@/lib/http/errors';
 
+const relatedLearningTargetSchema = z.object({
+  id: z.string().uuid(),
+  display_title: z.string(),
+  category: z.string(),
+  seen_count: z.number().int().nullable().optional(),
+});
+
 const relatedCardSchema = z.object({
   id: z.string().uuid(),
   card_type: z.string(),
@@ -11,6 +18,10 @@ const relatedCardSchema = z.object({
   hint: z.string().nullable(),
   status: z.string(),
   priority: z.number().int(),
+  learning_target_id: z.string().uuid().nullable().optional(),
+  learning_targets: z
+    .union([relatedLearningTargetSchema, z.array(relatedLearningTargetSchema).max(1), z.null()])
+    .optional(),
 });
 
 const reviewQueueRowSchema = z.object({
@@ -25,7 +36,9 @@ export async function GET(request: Request) {
     const now = new Date().toISOString();
     const { data, error } = await supabase
       .from('srs_state')
-      .select('due_at, cards!inner(id, card_type, front, back, hint, status, priority)')
+      .select(
+        'due_at, cards!inner(id, card_type, front, back, hint, status, priority, learning_target_id, learning_targets(id, display_title, category, seen_count))',
+      )
       .eq('user_id', userId)
       .eq('cards.status', 'active')
       .lte('due_at', now)
@@ -38,19 +51,29 @@ export async function GET(request: Request) {
     const cards = parsedRows
       .map((row) => {
         const card = Array.isArray(row.cards) ? row.cards[0] ?? null : row.cards;
+        if (!card) return null;
+        const ltRaw = card.learning_targets;
+        const lt = Array.isArray(ltRaw) ? ltRaw[0] ?? null : ltRaw ?? null;
         return {
-          cardId: card!.id,
-          cardType: card!.card_type,
-          front: card!.front,
-          back: card!.back,
-          hint: card!.hint,
+          cardId: card.id,
+          cardType: card.card_type,
+          front: card.front,
+          back: card.back,
+          hint: card.hint,
           dueAt: row.due_at,
-          priority: card!.priority,
+          priority: card.priority,
+          learningTarget: lt
+            ? {
+                id: lt.id,
+                title: lt.display_title,
+                category: lt.category,
+                seenCount: lt.seen_count ?? 1,
+                masteryLevel: 0,
+              }
+            : null,
         };
       })
-      // Secondary sort: stable order so same due_at falls back to priority desc.
-      // SQL-side LIMIT 20 already ran on (due_at asc); within the result set
-      // we re-sort to put higher-priority cards first on ties.
+      .filter((c): c is NonNullable<typeof c> => c !== null)
       .sort((a, b) => {
         if (a.dueAt < b.dueAt) return -1;
         if (a.dueAt > b.dueAt) return 1;

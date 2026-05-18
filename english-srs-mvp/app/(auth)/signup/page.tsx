@@ -4,6 +4,7 @@ import Link from 'next/link';
 import type { Route } from 'next';
 import { useRouter } from 'next/navigation';
 import { useState, type FormEvent } from 'react';
+import { Button } from '@/components/ui/Button';
 import { getBrowserSupabase } from '@/lib/supabase/browser';
 
 const DASHBOARD_ROUTE = '/dashboard' as Route;
@@ -41,39 +42,43 @@ export default function SignupPage() {
 
   return (
     <>
-      <h1>Sign up</h1>
-      <form onSubmit={onSubmit} className="auth-form">
-        <label>
-          <span>Email</span>
+      <h1 className="font-serif text-[32px] leading-none mb-1">Sign up</h1>
+      <p className="text-[13px] text-ink-soft mb-6">Create your Plait account.</p>
+      <form onSubmit={onSubmit} className="grid gap-3.5">
+        <label className="grid gap-1.5">
+          <span className="text-[12px] text-ink-soft">Email</span>
           <input
             type="email"
             required
             autoComplete="email"
-            className="input"
             value={email}
             onChange={(e) => setEmail(e.target.value)}
+            className="block w-full rounded border border-line bg-bg-elev px-3 py-2 text-[14px] focus:outline-none focus:border-ink"
           />
         </label>
-        <label>
-          <span>Password</span>
+        <label className="grid gap-1.5">
+          <span className="text-[12px] text-ink-soft">Password</span>
           <input
             type="password"
             required
             minLength={6}
             autoComplete="new-password"
-            className="input"
             value={password}
             onChange={(e) => setPassword(e.target.value)}
+            className="block w-full rounded border border-line bg-bg-elev px-3 py-2 text-[14px] focus:outline-none focus:border-ink"
           />
         </label>
-        {error && <p className="auth-error">{error}</p>}
-        {info && <p className="auth-info">{info}</p>}
-        <button type="submit" className="btn" disabled={submitting}>
+        {error && <p className="text-[13px] text-rose-deep">{error}</p>}
+        {info && <p className="text-[13px] text-sage-deep">{info}</p>}
+        <Button type="submit" variant="primary" disabled={submitting}>
           {submitting ? 'Creating account…' : 'Sign up'}
-        </button>
+        </Button>
       </form>
-      <p className="muted">
-        Already have an account? <Link href={LOGIN_ROUTE}>Sign in</Link>
+      <p className="mt-5 text-[12px] text-ink-faint">
+        Already have an account?{' '}
+        <Link href={LOGIN_ROUTE} className="text-ink underline">
+          Sign in
+        </Link>
       </p>
     </>
   );

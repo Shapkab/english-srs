@@ -4,6 +4,7 @@ import Link from 'next/link';
 import type { Route } from 'next';
 import { useRouter } from 'next/navigation';
 import { useState, type FormEvent } from 'react';
+import { Button } from '@/components/ui/Button';
 import { getBrowserSupabase } from '@/lib/supabase/browser';
 
 const DASHBOARD_ROUTE = '/dashboard' as Route;
@@ -35,38 +36,69 @@ export default function LoginPage() {
 
   return (
     <>
-      <h1>Sign in</h1>
-      <form onSubmit={onSubmit} className="auth-form">
-        <label>
-          <span>Email</span>
-          <input
-            type="email"
-            required
-            autoComplete="email"
-            className="input"
-            value={email}
-            onChange={(e) => setEmail(e.target.value)}
-          />
-        </label>
-        <label>
-          <span>Password</span>
-          <input
-            type="password"
-            required
-            autoComplete="current-password"
-            className="input"
-            value={password}
-            onChange={(e) => setPassword(e.target.value)}
-          />
-        </label>
-        {error && <p className="auth-error">{error}</p>}
-        <button type="submit" className="btn" disabled={submitting}>
+      <h1 className="font-serif text-[32px] leading-none mb-1">Welcome back</h1>
+      <p className="text-[13px] text-ink-soft mb-6">Sign in to continue.</p>
+      <form onSubmit={onSubmit} className="grid gap-3.5">
+        <Field
+          label="Email"
+          type="email"
+          autoComplete="email"
+          value={email}
+          onChange={setEmail}
+          required
+        />
+        <Field
+          label="Password"
+          type="password"
+          autoComplete="current-password"
+          value={password}
+          onChange={setPassword}
+          required
+        />
+        {error && <p className="text-[13px] text-rose-deep">{error}</p>}
+        <Button type="submit" variant="primary" disabled={submitting}>
           {submitting ? 'Signing in…' : 'Sign in'}
-        </button>
+        </Button>
       </form>
-      <p className="muted">
-        No account? <Link href={SIGNUP_ROUTE}>Sign up</Link>
+      <p className="mt-5 text-[12px] text-ink-faint">
+        No account?{' '}
+        <Link href={SIGNUP_ROUTE} className="text-ink underline">
+          Sign up
+        </Link>
       </p>
     </>
+  );
+}
+
+function Field({
+  label,
+  type,
+  value,
+  onChange,
+  autoComplete,
+  required,
+  minLength,
+}: {
+  label: string;
+  type: 'email' | 'password';
+  value: string;
+  onChange: (v: string) => void;
+  autoComplete?: string;
+  required?: boolean;
+  minLength?: number;
+}) {
+  return (
+    <label className="grid gap-1.5">
+      <span className="text-[12px] text-ink-soft">{label}</span>
+      <input
+        type={type}
+        value={value}
+        onChange={(e) => onChange(e.target.value)}
+        autoComplete={autoComplete}
+        required={required}
+        minLength={minLength}
+        className="block w-full rounded border border-line bg-bg-elev px-3 py-2 text-[14px] focus:outline-none focus:border-ink"
+      />
+    </label>
   );
 }
