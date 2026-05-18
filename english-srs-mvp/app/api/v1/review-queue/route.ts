@@ -2,6 +2,14 @@ import { NextResponse } from 'next/server';
 import { z } from 'zod';
 import { requireUserContext } from '@/lib/auth/user';
 import { toErrorResponse } from '@/lib/http/errors';
+import { masteryLevelsByLearningTarget } from '@/lib/srs/mastery';
+
+const relatedLearningTargetSchema = z.object({
+  id: z.string().uuid(),
+  display_title: z.string(),
+  category: z.string(),
+  seen_count: z.number().int().nullable().optional(),
+});
 
 const relatedCardSchema = z.object({
   id: z.string().uuid(),
@@ -11,6 +19,10 @@ const relatedCardSchema = z.object({
   hint: z.string().nullable(),
   status: z.string(),
   priority: z.number().int(),
+  learning_target_id: z.string().uuid().nullable().optional(),
+  learning_targets: z
+    .union([relatedLearningTargetSchema, z.array(relatedLearningTargetSchema).max(1), z.null()])
+    .optional(),
 });
 
 const reviewQueueRowSchema = z.object({
@@ -21,11 +33,28 @@ const reviewQueueRowSchema = z.object({
 export async function GET(request: Request) {
   try {
     const { userId, supabase } = await requireUserContext(request);
-
+    const url = new URL(request.url);
+    const wantsCountOnly = url.searchParams.get('count') === '1';
     const now = new Date().toISOString();
+
+    if (wantsCountOnly) {
+      // Cheap path for the sidebar badge: count only, no card rows.
+      // Mirrors the head-only count pattern in /api/v1/learning-targets.
+      const { count, error: countErr } = await supabase
+        .from('srs_state')
+        .select('card_id, cards!inner(status)', { count: 'exact', head: true })
+        .eq('user_id', userId)
+        .eq('cards.status', 'active')
+        .lte('due_at', now);
+      if (countErr) throw countErr;
+      return NextResponse.json({ total: count ?? 0 });
+    }
+
     const { data, error } = await supabase
       .from('srs_state')
-      .select('due_at, cards!inner(id, card_type, front, back, hint, status, priority)')
+      .select(
+        'due_at, cards!inner(id, card_type, front, back, hint, status, priority, learning_target_id, learning_targets(id, display_title, category, seen_count))',
+      )
       .eq('user_id', userId)
       .eq('cards.status', 'active')
       .lte('due_at', now)
@@ -35,28 +64,49 @@ export async function GET(request: Request) {
     if (error) throw error;
 
     const parsedRows = z.array(reviewQueueRowSchema).parse(data ?? []);
-    const cards = parsedRows
+    const draft = parsedRows
       .map((row) => {
         const card = Array.isArray(row.cards) ? row.cards[0] ?? null : row.cards;
+        if (!card) return null;
+        const ltRaw = card.learning_targets;
+        const lt = Array.isArray(ltRaw) ? ltRaw[0] ?? null : ltRaw ?? null;
         return {
-          cardId: card!.id,
-          cardType: card!.card_type,
-          front: card!.front,
-          back: card!.back,
-          hint: card!.hint,
+          cardId: card.id,
+          cardType: card.card_type,
+          front: card.front,
+          back: card.back,
+          hint: card.hint,
           dueAt: row.due_at,
-          priority: card!.priority,
+          priority: card.priority,
+          learningTarget: lt
+            ? {
+                id: lt.id,
+                title: lt.display_title,
+                category: lt.category,
+                seenCount: lt.seen_count ?? 1,
+              }
+            : null,
         };
       })
-      // Secondary sort: stable order so same due_at falls back to priority desc.
-      // SQL-side LIMIT 20 already ran on (due_at asc); within the result set
-      // we re-sort to put higher-priority cards first on ties.
+      .filter((c): c is NonNullable<typeof c> => c !== null);
+
+    const ltIds = Array.from(
+      new Set(draft.map((c) => c.learningTarget?.id).filter((id): id is string => !!id)),
+    );
+    const masteryByLt = await masteryLevelsByLearningTarget(supabase, userId, ltIds);
+
+    const cards = draft
       .sort((a, b) => {
         if (a.dueAt < b.dueAt) return -1;
         if (a.dueAt > b.dueAt) return 1;
         return b.priority - a.priority;
       })
-      .map(({ priority: _priority, ...rest }) => rest);
+      .map(({ priority: _priority, learningTarget, ...rest }) => ({
+        ...rest,
+        learningTarget: learningTarget
+          ? { ...learningTarget, masteryLevel: masteryByLt[learningTarget.id] ?? 0 }
+          : null,
+      }));
 
     return NextResponse.json({ cards });
   } catch (error) {

@@ -375,6 +375,7 @@ export type Database = {
           first_seen_at: string
           id: string
           last_seen_at: string
+          mastered_at: string | null
           merged_into_id: string | null
           seen_count: number
           status: string
@@ -391,6 +392,7 @@ export type Database = {
           first_seen_at?: string
           id?: string
           last_seen_at?: string
+          mastered_at?: string | null
           merged_into_id?: string | null
           seen_count?: number
           status?: string
@@ -407,6 +409,7 @@ export type Database = {
           first_seen_at?: string
           id?: string
           last_seen_at?: string
+          mastered_at?: string | null
           merged_into_id?: string | null
           seen_count?: number
           status?: string
