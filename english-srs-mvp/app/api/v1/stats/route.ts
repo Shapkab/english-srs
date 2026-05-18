@@ -36,10 +36,10 @@ export async function GET(request: Request) {
         .gte('first_seen_at', weekAgo),
       supabase
         .from('learning_targets')
-        .select('id, updated_at', { count: 'exact' })
+        .select('id, mastered_at', { count: 'exact' })
         .eq('user_id', userId)
         .eq('status', 'mastered')
-        .gte('updated_at', prevMonthStart),
+        .gte('mastered_at', prevMonthStart),
       supabase
         .from('learning_targets')
         .select('id', { count: 'exact', head: true })
@@ -65,7 +65,7 @@ export async function GET(request: Request) {
     let masteredThisMonth = 0;
     let masteredPrev = 0;
     for (const row of masteredRows) {
-      const t = row.updated_at;
+      const t = row.mastered_at;
       if (!t) continue;
       if (t >= monthStart) masteredThisMonth += 1;
       else if (t >= prevMonthStart) masteredPrev += 1;
