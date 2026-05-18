@@ -174,6 +174,17 @@ const isDirectRun =
   Boolean(process.argv[1]) && import.meta.url === pathToFileURL(process.argv[1]!).href;
 
 if (isDirectRun) {
+  // Mirror what `next dev` and tests/setup.ts do — tsx doesn't auto-load .env.local.
+  try {
+    process.loadEnvFile('.env.local');
+  } catch {
+    // fall through to .env / real environment
+  }
+  try {
+    process.loadEnvFile('.env');
+  } catch {
+    // both files optional
+  }
   runForever().catch((error) => {
     console.error('[worker] fatal', error);
     process.exit(1);
