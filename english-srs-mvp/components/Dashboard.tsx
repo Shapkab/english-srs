@@ -9,6 +9,7 @@ import { Composer } from '@/components/Composer';
 import SubmissionsList from '@/components/SubmissionsList';
 import { Topbar } from '@/components/Topbar';
 import { LabelTiny } from '@/components/ui/LabelTiny';
+import { Skeleton } from '@/components/ui/Skeleton';
 import { cn } from '@/lib/ui/cn';
 import { weekdayDate } from '@/lib/ui/humanize';
 import { fetchWithAuth } from '@/lib/api/client';
@@ -69,13 +70,14 @@ export function Dashboard() {
     };
   }, []);
 
+  const loading = dueCount === null || firstName === '';
   const subtitle = useMemo(() => {
-    if (dueCount === null || firstName === '') return 'Loading your day…';
+    if (loading) return undefined;
     if (dueCount === 0) {
       return "You're all caught up — submit something new to keep your queue alive.";
     }
     return `${greeting}, ${firstName} — ${dueCount} ${dueCount === 1 ? 'card is' : 'cards are'} due.`;
-  }, [dueCount, firstName, greeting]);
+  }, [loading, dueCount, firstName, greeting]);
 
   const minutes = dueCount === null ? 0 : Math.max(1, Math.ceil((dueCount * 40) / 60));
 
@@ -83,7 +85,7 @@ export function Dashboard() {
     <main className="px-10 py-9 max-w-[1280px]">
       <Topbar
         title={today}
-        subtitle={subtitle}
+        subtitle={loading ? <Skeleton className="h-3 w-[320px] max-w-full" /> : subtitle}
         actions={
           <Link href="#composer">
             <Button variant="primary" size="md">
@@ -94,8 +96,8 @@ export function Dashboard() {
       />
 
       <section className="grid grid-cols-1 lg:grid-cols-[1.4fr_1fr] gap-5 mb-9">
-        <HeroReviewCard dueCount={dueCount} minutes={minutes} />
-        <StatColumn stats={stats} />
+        {loading ? <HeroSkeleton /> : <HeroReviewCard dueCount={dueCount} minutes={minutes} />}
+        {loading ? <StatColumnSkeleton /> : <StatColumn stats={stats} />}
       </section>
 
       <section id="composer" className="mb-10 scroll-mt-10">
@@ -234,6 +236,32 @@ function formatDelta(n: number, suffix: string): string {
 function formatPctDelta(n: number): string {
   const sign = n > 0 ? '+' : n < 0 ? '' : '±';
   return `${sign}${n}%`;
+}
+
+function HeroSkeleton() {
+  return (
+    <div className="relative overflow-hidden rounded-lg border border-line bg-bg-card p-7 min-h-[260px]">
+      <Skeleton className="h-3 w-16 mb-6" />
+      <div className="flex items-end gap-4 mb-4">
+        <Skeleton rounded="md" className="h-[88px] w-[120px]" />
+        <Skeleton className="h-4 w-28 mb-3" />
+      </div>
+      <Skeleton className="h-3 w-40" />
+    </div>
+  );
+}
+
+function StatColumnSkeleton() {
+  return (
+    <div className="grid grid-cols-1 gap-3">
+      {Array.from({ length: 3 }, (_, i) => (
+        <div key={i} className="p-4 px-5 rounded-md border border-line bg-bg-card">
+          <Skeleton className="h-3 w-32 mb-2" />
+          <Skeleton className="h-6 w-16" />
+        </div>
+      ))}
+    </div>
+  );
 }
 
 function getGreeting(hour: number): string {

@@ -9,6 +9,7 @@ import { Flashcard } from '@/components/Flashcard';
 import { RatingRow } from '@/components/RatingRow';
 import { Button } from '@/components/ui/Button';
 import { Kbd } from '@/components/ui/Kbd';
+import { Skeleton } from '@/components/ui/Skeleton';
 import { fetchWithAuth } from '@/lib/api/client';
 import { toUserMessage, type ErrorPayload } from '@/lib/api/error-messages';
 import { trackEvent } from '@/lib/analytics/events';
@@ -321,8 +322,23 @@ function ReviewChrome(props: ChromeProps) {
 
   if (phase.kind === 'loading_queue') {
     return (
-      <main className="grid place-items-center min-h-screen bg-bg">
-        <p className="text-[13px] text-ink-faint">Loading your queue…</p>
+      <main className="grid place-items-center min-h-screen bg-bg px-10">
+        <div
+          className="w-full max-w-[720px] rounded-[28px] border border-line bg-bg-card p-12 px-14 shadow-lift"
+          role="status"
+          aria-busy="true"
+          aria-live="polite"
+          aria-label="Loading review queue"
+        >
+          <Skeleton className="h-4 w-24 mb-6" />
+          <div className="min-h-[160px] flex flex-col items-center justify-center gap-4">
+            <Skeleton className="h-6 w-3/4" />
+            <Skeleton className="h-6 w-2/3" />
+          </div>
+          <div className="mt-7 pt-5 border-t border-dashed border-line-soft">
+            <Skeleton className="h-5 w-1/2 mx-auto" />
+          </div>
+        </div>
       </main>
     );
   }

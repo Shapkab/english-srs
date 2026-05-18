@@ -36,7 +36,7 @@ export function AuthGate({ children, fallback }: AuthGateProps) {
 
   if (!authChecked) {
     return (
-      <>{fallback ?? <div className="p-8 text-ink-faint text-sm">Loading…</div>}</>
+      <>{fallback ?? <div role="status" aria-busy="true" aria-live="polite" className="min-h-screen bg-bg" />}</>
     );
   }
   return <>{children}</>;
