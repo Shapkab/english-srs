@@ -100,6 +100,39 @@ describe('toErrorResponse (R-014 structured logger wiring)', () => {
     expect('stack' in logged).toBe(false); // production omits stack from logs
   });
 
+  it('non-Error throwable (Postgrest-shape): logs message/code/details — never [object Object]', async () => {
+    const postgrestLike = {
+      message: 'permission denied for table submissions',
+      code: '42501',
+      details: 'role "anon" lacks INSERT',
+      hint: 'check RLS policy',
+    };
+    const request = new Request('http://localhost/api/v1/submissions', {
+      method: 'POST',
+      headers: { 'x-request-id': 'rid-postgrest' },
+    });
+    const response = toErrorResponse(postgrestLike, request);
+    expect(response.status).toBe(500);
+
+    expect(consoleErrorSpy).toHaveBeenCalledTimes(1);
+    const logged = JSON.parse(consoleErrorSpy.mock.calls[0][0] as string) as Record<string, unknown>;
+    expect(logged.errorName).toBe('PostgrestError(42501)');
+    expect(logged.message).toBe(
+      'permission denied for table submissions — role "anon" lacks INSERT | check RLS policy',
+    );
+    // Sanity: the old failure mode must not regress.
+    expect(logged.message).not.toBe('[object Object]');
+    expect(logged.errorName).not.toBe('object');
+  });
+
+  it('non-Error throwable (bare string): logs the string', async () => {
+    const response = toErrorResponse('boom-string');
+    expect(response.status).toBe(500);
+    const logged = JSON.parse(consoleErrorSpy.mock.calls[0][0] as string) as Record<string, unknown>;
+    expect(logged.errorName).toBe('string');
+    expect(logged.message).toBe('boom-string');
+  });
+
   it('NODE_ENV=development: api_error log includes the stack field', async () => {
     setNodeEnv('development');
     const request = new Request('http://localhost/api/v1/submissions', { method: 'POST' });

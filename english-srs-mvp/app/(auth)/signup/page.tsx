@@ -65,8 +65,10 @@ export default function SignupPage() {
             autoComplete="new-password"
             value={password}
             onChange={(e) => setPassword(e.target.value)}
+            aria-describedby="signup-password-hint"
             className="block w-full rounded border border-line bg-bg-elev px-3 py-2 text-[14px] focus:outline-none focus:border-ink"
           />
+          <p id="signup-password-hint" className="text-[12px] text-ink-faint">At least 6 characters.</p>
         </label>
         {error && <p className="text-[13px] text-rose-deep">{error}</p>}
         {info && <p className="text-[13px] text-sage-deep">{info}</p>}

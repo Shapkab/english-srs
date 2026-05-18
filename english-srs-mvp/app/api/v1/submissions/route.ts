@@ -69,6 +69,6 @@ export async function GET(request: Request) {
 
     return NextResponse.json({ submissions: data ?? [] });
   } catch (error) {
-    return toErrorResponse(error);
+    return toErrorResponse(error, request);
   }
 }
