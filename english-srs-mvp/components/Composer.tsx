@@ -5,16 +5,22 @@ import type { Route } from 'next';
 import { useRouter } from 'next/navigation';
 import { ArrowRight } from 'lucide-react';
 import { Button } from '@/components/ui/Button';
+import { Toast } from '@/components/ui/Toast';
 import { fetchWithAuth } from '@/lib/api/client';
 import { toUserMessage, type ErrorPayload } from '@/lib/api/error-messages';
 
 const DRAFT_KEY = 'plait:draft';
+// Brief delay so users see the success toast before the redirect tears
+// the Composer down. Long enough to register, short enough not to feel
+// like a stall.
+const REDIRECT_AFTER_SUCCESS_MS = 1200;
 
 export function Composer() {
   const router = useRouter();
   const [text, setText] = useState('');
   const [submitting, setSubmitting] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [toastOpen, setToastOpen] = useState(false);
   const textareaRef = useRef<HTMLTextAreaElement>(null);
 
   // Hydrate draft after mount to avoid SSR/CSR mismatch.
@@ -65,15 +71,22 @@ export function Composer() {
       } catch {
         // ignore
       }
-      router.push(`/submissions/${body.submissionId}` as Route);
+      setToastOpen(true);
+      window.setTimeout(
+        () => router.push(`/submissions/${body.submissionId}` as Route),
+        REDIRECT_AFTER_SUCCESS_MS,
+      );
     } catch (e) {
       setError(e instanceof Error ? e.message : String(e));
-    } finally {
       setSubmitting(false);
+      return;
     }
+    // Keep `submitting` true through the post-success redirect so the
+    // form stays disabled and the textarea can't be re-edited.
   }
 
   return (
+    <>
     <form
       onSubmit={onSubmit}
       className="rounded-lg border border-line bg-bg-card overflow-hidden"
@@ -99,9 +112,6 @@ export function Composer() {
         </div>
         <div className="flex items-center gap-2">
           {error && <span className="text-[12px] text-rose-deep">{error}</span>}
-          <Button type="button" variant="ghost" size="sm" disabled>
-            Save draft
-          </Button>
           <Button
             type="submit"
             variant="primary"
@@ -114,5 +124,12 @@ export function Composer() {
         </div>
       </div>
     </form>
+    <Toast
+      open={toastOpen}
+      message="Submission sent for analysis"
+      variant="success"
+      onDismiss={() => setToastOpen(false)}
+    />
+    </>
   );
 }

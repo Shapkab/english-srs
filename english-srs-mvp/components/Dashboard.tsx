@@ -9,6 +9,7 @@ import { Composer } from '@/components/Composer';
 import SubmissionsList from '@/components/SubmissionsList';
 import { Topbar } from '@/components/Topbar';
 import { LabelTiny } from '@/components/ui/LabelTiny';
+import { Skeleton } from '@/components/ui/Skeleton';
 import { cn } from '@/lib/ui/cn';
 import { weekdayDate } from '@/lib/ui/humanize';
 import { fetchWithAuth } from '@/lib/api/client';
@@ -31,6 +32,9 @@ export function Dashboard() {
   const [firstName, setFirstName] = useState<string>('');
   const [dueCount, setDueCount] = useState<number | null>(null);
   const [stats, setStats] = useState<StatsResponse | null>(null);
+  // Greeting is derived from local time; setting it inside the same load
+  // effect avoids a hydration mismatch (server timezone vs. client).
+  const [greeting, setGreeting] = useState<string>('Good morning');
 
   useEffect(() => {
     let cancelled = false;
@@ -38,6 +42,7 @@ export function Dashboard() {
       const supabase = getBrowserSupabase();
       const { data } = await supabase.auth.getSession();
       if (cancelled) return;
+      setGreeting(getGreeting(new Date().getHours()));
       const meta = (data.session?.user.user_metadata ?? {}) as { name?: string; full_name?: string };
       const email = data.session?.user.email ?? '';
       const candidate = meta.name ?? meta.full_name ?? email.split('@')[0] ?? 'friend';
@@ -65,13 +70,14 @@ export function Dashboard() {
     };
   }, []);
 
+  const loading = dueCount === null || firstName === '';
   const subtitle = useMemo(() => {
-    if (dueCount === null || firstName === '') return 'Loading your day…';
+    if (loading) return undefined;
     if (dueCount === 0) {
       return "You're all caught up — submit something new to keep your queue alive.";
     }
-    return `Good morning, ${firstName} — ${dueCount} ${dueCount === 1 ? 'card is' : 'cards are'} due.`;
-  }, [dueCount, firstName]);
+    return `${greeting}, ${firstName} — ${dueCount} ${dueCount === 1 ? 'card is' : 'cards are'} due.`;
+  }, [loading, dueCount, firstName, greeting]);
 
   const minutes = dueCount === null ? 0 : Math.max(1, Math.ceil((dueCount * 40) / 60));
 
@@ -79,24 +85,19 @@ export function Dashboard() {
     <main className="px-10 py-9 max-w-[1280px]">
       <Topbar
         title={today}
-        subtitle={subtitle}
+        subtitle={loading ? <Skeleton className="h-3 w-[320px] max-w-full" /> : subtitle}
         actions={
-          <>
-            <Button variant="ghost" size="md" disabled>
-              Import text
+          <Link href="#composer">
+            <Button variant="primary" size="md">
+              New submission <ArrowRight size={14} strokeWidth={1.8} />
             </Button>
-            <Link href="#composer">
-              <Button variant="primary" size="md">
-                New submission <ArrowRight size={14} strokeWidth={1.8} />
-              </Button>
-            </Link>
-          </>
+          </Link>
         }
       />
 
       <section className="grid grid-cols-1 lg:grid-cols-[1.4fr_1fr] gap-5 mb-9">
-        <HeroReviewCard dueCount={dueCount} minutes={minutes} />
-        <StatColumn stats={stats} />
+        {loading ? <HeroSkeleton /> : <HeroReviewCard dueCount={dueCount} minutes={minutes} />}
+        {loading ? <StatColumnSkeleton /> : <StatColumn stats={stats} />}
       </section>
 
       <section id="composer" className="mb-10 scroll-mt-10">
@@ -148,14 +149,6 @@ function HeroReviewCard({ dueCount, minutes }: { dueCount: number | null; minute
               </span>
             </div>
           </div>
-          {!isEmpty && (
-            <div className="grid grid-cols-4 gap-3 max-w-[420px] pt-3">
-              <Stat label="new" value="—" />
-              <Stat label="learning" value="—" />
-              <Stat label="review" value={dueCount === null ? '—' : String(dueCount)} />
-              <Stat label="relearning" value="—" />
-            </div>
-          )}
         </div>
         <div className="pb-2">
           {isEmpty ? (
@@ -174,15 +167,6 @@ function HeroReviewCard({ dueCount, minutes }: { dueCount: number | null; minute
         </div>
       </div>
     </article>
-  );
-}
-
-function Stat({ label, value }: { label: string; value: string }) {
-  return (
-    <div className="flex flex-col gap-0.5">
-      <span className="font-mono text-[18px] text-ink tabular-nums">{value}</span>
-      <span className="text-[11px] text-ink-faint">{label}</span>
-    </div>
   );
 }
 
@@ -252,4 +236,37 @@ function formatDelta(n: number, suffix: string): string {
 function formatPctDelta(n: number): string {
   const sign = n > 0 ? '+' : n < 0 ? '' : '±';
   return `${sign}${n}%`;
+}
+
+function HeroSkeleton() {
+  return (
+    <div className="relative overflow-hidden rounded-lg border border-line bg-bg-card p-7 min-h-[260px]">
+      <Skeleton className="h-3 w-16 mb-6" />
+      <div className="flex items-end gap-4 mb-4">
+        <Skeleton rounded="md" className="h-[88px] w-[120px]" />
+        <Skeleton className="h-4 w-28 mb-3" />
+      </div>
+      <Skeleton className="h-3 w-40" />
+    </div>
+  );
+}
+
+function StatColumnSkeleton() {
+  return (
+    <div className="grid grid-cols-1 gap-3">
+      {Array.from({ length: 3 }, (_, i) => (
+        <div key={i} className="p-4 px-5 rounded-md border border-line bg-bg-card">
+          <Skeleton className="h-3 w-32 mb-2" />
+          <Skeleton className="h-6 w-16" />
+        </div>
+      ))}
+    </div>
+  );
+}
+
+function getGreeting(hour: number): string {
+  if (hour >= 5 && hour < 12) return 'Good morning';
+  if (hour >= 12 && hour < 17) return 'Good afternoon';
+  if (hour >= 17 && hour < 21) return 'Good evening';
+  return 'Good night';
 }

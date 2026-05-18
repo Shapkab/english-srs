@@ -48,7 +48,7 @@ export function Flashcard({ card, phase, onSuspended, feedbackOpen, onCloseFeedb
         <Badge tone={TONE_BY_CATEGORY[cat]}>{CATEGORY_LABEL[cat]}</Badge>
       </div>
       <div className="absolute right-7 top-7 font-mono text-[10px] uppercase tracking-[0.14em] text-ink-faint">
-        {card.cardType} · v0.3
+        {card.cardType}
       </div>
       <div className="absolute right-7 top-14 lg:top-16">
         <CardFeedbackMenu

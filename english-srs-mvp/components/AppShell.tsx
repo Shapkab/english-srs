@@ -3,6 +3,7 @@
 import { useEffect, useState, type ReactNode } from 'react';
 import { AuthGate } from '@/components/AuthGate';
 import { Sidebar } from '@/components/Sidebar';
+import { MobileNav } from '@/components/MobileNav';
 import { fetchWithAuth } from '@/lib/api/client';
 
 interface AppShellProps {
@@ -65,7 +66,10 @@ export function AppShell({ children }: AppShellProps) {
           targetCount={counts.targets}
           streak={streak}
         />
-        <div className="flex-1 min-w-0">{children}</div>
+        <div className="flex-1 min-w-0 flex flex-col">
+          <MobileNav dueCount={counts.due} targetCount={counts.targets} />
+          <div className="flex-1 min-w-0">{children}</div>
+        </div>
       </div>
     </AuthGate>
   );
