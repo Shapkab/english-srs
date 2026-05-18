@@ -33,8 +33,23 @@ const reviewQueueRowSchema = z.object({
 export async function GET(request: Request) {
   try {
     const { userId, supabase } = await requireUserContext(request);
-
+    const url = new URL(request.url);
+    const wantsCountOnly = url.searchParams.get('count') === '1';
     const now = new Date().toISOString();
+
+    if (wantsCountOnly) {
+      // Cheap path for the sidebar badge: count only, no card rows.
+      // Mirrors the head-only count pattern in /api/v1/learning-targets.
+      const { count, error: countErr } = await supabase
+        .from('srs_state')
+        .select('card_id, cards!inner(status)', { count: 'exact', head: true })
+        .eq('user_id', userId)
+        .eq('cards.status', 'active')
+        .lte('due_at', now);
+      if (countErr) throw countErr;
+      return NextResponse.json({ total: count ?? 0 });
+    }
+
     const { data, error } = await supabase
       .from('srs_state')
       .select(

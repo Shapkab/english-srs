@@ -28,14 +28,14 @@ export function AppShell({ children }: AppShellProps) {
     async function load() {
       try {
         const [queueRes, targetsRes, statsRes] = await Promise.all([
-          fetchWithAuth('/api/v1/review-queue'),
+          fetchWithAuth('/api/v1/review-queue?count=1'),
           fetchWithAuth('/api/v1/learning-targets?count=1'),
           fetchWithAuth('/api/v1/stats'),
         ]);
         if (cancelled) return;
         if (queueRes.ok) {
-          const body = (await queueRes.json()) as { cards: unknown[] };
-          setCounts((c) => ({ ...c, due: body.cards.length }));
+          const body = (await queueRes.json()) as { total: number };
+          setCounts((c) => ({ ...c, due: body.total }));
         }
         if (targetsRes.ok) {
           const body = (await targetsRes.json()) as { total: number };
