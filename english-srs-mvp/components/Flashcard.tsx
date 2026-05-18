@@ -89,7 +89,6 @@ export function Flashcard({ card, phase, onSuspended, feedbackOpen, onCloseFeedb
       {phase === 'answer' && !isCloze && card.back.trim().length > 0 && (
         <div className="mt-7 pt-5 border-t border-dashed border-line-strong">
           <p className="font-serif text-[26px] leading-snug text-center">
-            <span className="line-through text-ink-soft mr-2">{extractError(card.front)}</span>
             <span
               className="px-1.5 py-0.5 rounded-sm"
               style={{ background: 'color-mix(in oklch, var(--sage) 60%, transparent)' }}
@@ -130,8 +129,3 @@ function renderSegment(seg: ClozeSegment, i: number, phase: 'question' | 'answer
   );
 }
 
-function extractError(front: string): string {
-  // crude: take the part before " → " if present; otherwise empty
-  const idx = front.indexOf(' → ');
-  return idx > 0 ? front.slice(0, idx) : '';
-}
