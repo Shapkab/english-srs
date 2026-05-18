@@ -3,13 +3,12 @@
 import Link from 'next/link';
 import type { Route } from 'next';
 import { usePathname } from 'next/navigation';
-import { Calendar, Layers, Crosshair, Inbox, Sparkles, Settings } from 'lucide-react';
+import { Calendar, Layers, Crosshair } from 'lucide-react';
 import { cn } from '@/lib/ui/cn';
 
 interface SidebarProps {
   dueCount?: number | null;
   targetCount?: number | null;
-  submissionsCount?: number | null;
   streak?: boolean[]; // length 14, true = active past day; the final true is "today"
 }
 
@@ -18,27 +17,15 @@ interface NavItem {
   label: string;
   Icon: typeof Calendar;
   count: number | null;
-  enabled: boolean;
 }
 
-export function Sidebar({
-  dueCount = null,
-  targetCount = null,
-  submissionsCount = null,
-  streak,
-}: SidebarProps) {
+export function Sidebar({ dueCount = null, targetCount = null, streak }: SidebarProps) {
   const pathname = usePathname();
 
   const practice: NavItem[] = [
-    { href: '/dashboard' as Route, label: 'Today', Icon: Calendar, count: dueCount, enabled: true },
-    { href: '/review' as Route, label: 'Review', Icon: Layers, count: dueCount, enabled: true },
-    { href: '/targets' as Route, label: 'Learning targets', Icon: Crosshair, count: targetCount, enabled: true },
-    { href: '/submissions' as Route, label: 'Submissions', Icon: Inbox, count: submissionsCount, enabled: false },
-  ];
-
-  const more: NavItem[] = [
-    { href: '/insights' as Route, label: 'Insights', Icon: Sparkles, count: null, enabled: false },
-    { href: '/settings' as Route, label: 'Settings', Icon: Settings, count: null, enabled: false },
+    { href: '/dashboard' as Route, label: 'Today', Icon: Calendar, count: dueCount },
+    { href: '/review' as Route, label: 'Review', Icon: Layers, count: dueCount },
+    { href: '/targets' as Route, label: 'Learning targets', Icon: Crosshair, count: targetCount },
   ];
 
   return (
@@ -53,7 +40,6 @@ export function Sidebar({
       </div>
 
       <NavGroup title="Practice" items={practice} pathname={pathname} />
-      <NavGroup title="More" items={more} pathname={pathname} />
 
       {streak && streak.length > 0 && (
         <div className="mt-auto rounded-lg border border-line-soft bg-bg-card p-3.5">
@@ -91,10 +77,9 @@ function NavGroup({ title, items, pathname }: { title: string; items: NavItem[];
         const className = cn(
           'group flex items-center gap-2.5 rounded-lg px-3 py-2 text-[13px] transition-colors',
           active ? 'bg-ink text-bg-elev' : 'text-ink-soft hover:bg-bg-sunken hover:text-ink',
-          !it.enabled && 'opacity-60 cursor-not-allowed pointer-events-none',
         );
-        const inner = (
-          <>
+        return (
+          <Link key={it.label} href={it.href} className={className}>
             <it.Icon size={16} strokeWidth={1.7} />
             <span className="flex-1">{it.label}</span>
             {it.count !== null && (
@@ -102,16 +87,7 @@ function NavGroup({ title, items, pathname }: { title: string; items: NavItem[];
                 {it.count}
               </span>
             )}
-          </>
-        );
-        return it.enabled ? (
-          <Link key={it.label} href={it.href} className={className}>
-            {inner}
           </Link>
-        ) : (
-          <span key={it.label} className={className} aria-disabled>
-            {inner}
-          </span>
         );
       })}
     </div>

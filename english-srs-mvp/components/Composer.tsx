@@ -99,9 +99,6 @@ export function Composer() {
         </div>
         <div className="flex items-center gap-2">
           {error && <span className="text-[12px] text-rose-deep">{error}</span>}
-          <Button type="button" variant="ghost" size="sm" disabled>
-            Save draft
-          </Button>
           <Button
             type="submit"
             variant="primary"

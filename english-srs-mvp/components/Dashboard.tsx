@@ -31,6 +31,9 @@ export function Dashboard() {
   const [firstName, setFirstName] = useState<string>('');
   const [dueCount, setDueCount] = useState<number | null>(null);
   const [stats, setStats] = useState<StatsResponse | null>(null);
+  // Greeting is derived from local time; setting it inside the same load
+  // effect avoids a hydration mismatch (server timezone vs. client).
+  const [greeting, setGreeting] = useState<string>('Good morning');
 
   useEffect(() => {
     let cancelled = false;
@@ -38,6 +41,7 @@ export function Dashboard() {
       const supabase = getBrowserSupabase();
       const { data } = await supabase.auth.getSession();
       if (cancelled) return;
+      setGreeting(getGreeting(new Date().getHours()));
       const meta = (data.session?.user.user_metadata ?? {}) as { name?: string; full_name?: string };
       const email = data.session?.user.email ?? '';
       const candidate = meta.name ?? meta.full_name ?? email.split('@')[0] ?? 'friend';
@@ -70,8 +74,8 @@ export function Dashboard() {
     if (dueCount === 0) {
       return "You're all caught up — submit something new to keep your queue alive.";
     }
-    return `Good morning, ${firstName} — ${dueCount} ${dueCount === 1 ? 'card is' : 'cards are'} due.`;
-  }, [dueCount, firstName]);
+    return `${greeting}, ${firstName} — ${dueCount} ${dueCount === 1 ? 'card is' : 'cards are'} due.`;
+  }, [dueCount, firstName, greeting]);
 
   const minutes = dueCount === null ? 0 : Math.max(1, Math.ceil((dueCount * 40) / 60));
 
@@ -81,16 +85,11 @@ export function Dashboard() {
         title={today}
         subtitle={subtitle}
         actions={
-          <>
-            <Button variant="ghost" size="md" disabled>
-              Import text
+          <Link href="#composer">
+            <Button variant="primary" size="md">
+              New submission <ArrowRight size={14} strokeWidth={1.8} />
             </Button>
-            <Link href="#composer">
-              <Button variant="primary" size="md">
-                New submission <ArrowRight size={14} strokeWidth={1.8} />
-              </Button>
-            </Link>
-          </>
+          </Link>
         }
       />
 
@@ -148,14 +147,6 @@ function HeroReviewCard({ dueCount, minutes }: { dueCount: number | null; minute
               </span>
             </div>
           </div>
-          {!isEmpty && (
-            <div className="grid grid-cols-4 gap-3 max-w-[420px] pt-3">
-              <Stat label="new" value="—" />
-              <Stat label="learning" value="—" />
-              <Stat label="review" value={dueCount === null ? '—' : String(dueCount)} />
-              <Stat label="relearning" value="—" />
-            </div>
-          )}
         </div>
         <div className="pb-2">
           {isEmpty ? (
@@ -174,15 +165,6 @@ function HeroReviewCard({ dueCount, minutes }: { dueCount: number | null; minute
         </div>
       </div>
     </article>
-  );
-}
-
-function Stat({ label, value }: { label: string; value: string }) {
-  return (
-    <div className="flex flex-col gap-0.5">
-      <span className="font-mono text-[18px] text-ink tabular-nums">{value}</span>
-      <span className="text-[11px] text-ink-faint">{label}</span>
-    </div>
   );
 }
 
@@ -252,4 +234,11 @@ function formatDelta(n: number, suffix: string): string {
 function formatPctDelta(n: number): string {
   const sign = n > 0 ? '+' : n < 0 ? '' : '±';
   return `${sign}${n}%`;
+}
+
+function getGreeting(hour: number): string {
+  if (hour >= 5 && hour < 12) return 'Good morning';
+  if (hour >= 12 && hour < 17) return 'Good afternoon';
+  if (hour >= 17 && hour < 21) return 'Good evening';
+  return 'Good night';
 }
