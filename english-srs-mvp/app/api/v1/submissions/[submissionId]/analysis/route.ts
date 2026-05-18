@@ -3,6 +3,7 @@ import { requireUserContext } from '@/lib/auth/user';
 import { uuidParam } from '@/lib/validators/path-params';
 import { HttpError, toErrorResponse } from '@/lib/http/errors';
 import { masteryLevelsByLearningTarget } from '@/lib/srs/mastery';
+import { computeLinkKind } from '@/lib/ui/link-kind';
 
 export async function GET(request: Request, context: { params: Promise<{ submissionId: string }> }) {
   try {
@@ -102,15 +103,10 @@ export async function GET(request: Request, context: { params: Promise<{ submiss
       issues: (issues ?? []).map((issue) => {
         const ev = evidenceByIssue[issue.id];
         const lt = ev ? ltById[ev.ltId] : null;
-        const isNew = lt ? lt.firstSeenAt >= submissionCreatedAt : false;
         const mergedOccurrences = lt && lt.seenCount > 1 ? lt.seenCount : null;
-        const linkKind: 'created' | 'promoted' | 'merged' | null = lt
-          ? isNew
-            ? 'created'
-            : mergedOccurrences && mergedOccurrences > 1
-              ? 'merged'
-              : 'promoted'
-          : null;
+        const linkKind = computeLinkKind(
+          lt ? { firstSeenAt: lt.firstSeenAt, submissionCreatedAt, seenCount: lt.seenCount } : null,
+        );
         return {
           id: issue.id,
           category: issue.category,

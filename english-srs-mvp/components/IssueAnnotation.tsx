@@ -1,52 +1,11 @@
-import type { IssueCategory } from '@/lib/types/domain';
 import { CATEGORY_COLOR } from '@/lib/ui/category-color';
+import { findMarkers, type AnnotatedIssue } from '@/lib/ui/find-markers';
 
-export interface AnnotatedIssue {
-  id: string;
-  category: IssueCategory;
-  errorText: string;
-  correctedText: string;
-}
+export type { AnnotatedIssue };
 
 interface AnnotatedPassageProps {
   text: string;
   issues: AnnotatedIssue[];
-}
-
-interface Marker {
-  start: number;
-  end: number;
-  issue: AnnotatedIssue;
-  index: number;
-}
-
-function findMarkers(text: string, issues: AnnotatedIssue[]): Marker[] {
-  const used = new Set<string>();
-  const markers: Marker[] = [];
-  issues.forEach((issue, idx) => {
-    if (issue.errorText.trim().length === 0) return;
-    let from = 0;
-    while (from < text.length) {
-      const at = text.indexOf(issue.errorText, from);
-      if (at < 0) break;
-      const key = `${at}:${at + issue.errorText.length}`;
-      if (!used.has(key)) {
-        used.add(key);
-        markers.push({ start: at, end: at + issue.errorText.length, issue, index: idx + 1 });
-        break;
-      }
-      from = at + 1;
-    }
-  });
-  // Sort by start; drop overlaps (keep earlier)
-  markers.sort((a, b) => a.start - b.start);
-  const cleaned: Marker[] = [];
-  for (const m of markers) {
-    const prev = cleaned[cleaned.length - 1];
-    if (prev && m.start < prev.end) continue;
-    cleaned.push(m);
-  }
-  return cleaned;
 }
 
 export function AnnotatedPassage({ text, issues }: AnnotatedPassageProps) {
