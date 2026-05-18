@@ -2,9 +2,11 @@
 
 import Link from 'next/link';
 import type { Route } from 'next';
-import { usePathname } from 'next/navigation';
-import { Calendar, Layers, Crosshair, Inbox, Sparkles, Settings } from 'lucide-react';
+import { usePathname, useRouter } from 'next/navigation';
+import { useState } from 'react';
+import { Calendar, Layers, Crosshair, Inbox, Sparkles, Settings, LogOut } from 'lucide-react';
 import { cn } from '@/lib/ui/cn';
+import { getBrowserSupabase } from '@/lib/supabase/browser';
 
 interface SidebarProps {
   dueCount?: number | null;
@@ -28,6 +30,20 @@ export function Sidebar({
   streak,
 }: SidebarProps) {
   const pathname = usePathname();
+  const router = useRouter();
+  const [signingOut, setSigningOut] = useState(false);
+
+  async function onSignOut() {
+    setSigningOut(true);
+    try {
+      await getBrowserSupabase().auth.signOut();
+    } catch {
+      // Swallow — the worst case is the local session was already invalid.
+      // We still redirect the user to /login on the next line.
+    } finally {
+      router.replace('/login' as Route);
+    }
+  }
 
   const practice: NavItem[] = [
     { href: '/dashboard' as Route, label: 'Today', Icon: Calendar, count: dueCount, enabled: true },
@@ -55,29 +71,40 @@ export function Sidebar({
       <NavGroup title="Practice" items={practice} pathname={pathname} />
       <NavGroup title="More" items={more} pathname={pathname} />
 
-      {streak && streak.length > 0 && (
-        <div className="mt-auto rounded-lg border border-line-soft bg-bg-card p-3.5">
-          <div className="label-tiny mb-2">{streak.filter(Boolean).length}-day streak</div>
-          <div className="flex gap-1">
-            {streak.map((active, i) => {
-              const isToday = i === streak.length - 1;
-              // Today is peach only when the user actually reviewed
-              // today; an inactive "today" stays line-soft so an empty
-              // streak block reads as empty.
-              const colorClass = isToday
-                ? active
-                  ? 'bg-peach'
-                  : 'bg-line-soft'
-                : active
-                  ? 'bg-sage'
-                  : 'bg-line-soft';
-              return (
-                <span key={i} className={cn('h-[14px] w-[14px] rounded', colorClass)} />
-              );
-            })}
+      <div className="mt-auto flex flex-col gap-3">
+        {streak && streak.length > 0 && (
+          <div className="rounded-lg border border-line-soft bg-bg-card p-3.5">
+            <div className="label-tiny mb-2">{streak.filter(Boolean).length}-day streak</div>
+            <div className="flex gap-1">
+              {streak.map((active, i) => {
+                const isToday = i === streak.length - 1;
+                // Today is peach only when the user actually reviewed
+                // today; an inactive "today" stays line-soft so an empty
+                // streak block reads as empty.
+                const colorClass = isToday
+                  ? active
+                    ? 'bg-peach'
+                    : 'bg-line-soft'
+                  : active
+                    ? 'bg-sage'
+                    : 'bg-line-soft';
+                return (
+                  <span key={i} className={cn('h-[14px] w-[14px] rounded', colorClass)} />
+                );
+              })}
+            </div>
           </div>
-        </div>
-      )}
+        )}
+        <button
+          type="button"
+          onClick={onSignOut}
+          disabled={signingOut}
+          className="group flex items-center gap-2.5 rounded-lg px-3 py-2 text-[13px] text-ink-soft transition-colors hover:bg-bg-sunken hover:text-ink disabled:opacity-60 disabled:cursor-not-allowed"
+        >
+          <LogOut size={16} strokeWidth={1.7} />
+          <span className="flex-1 text-left">{signingOut ? 'Signing out…' : 'Sign out'}</span>
+        </button>
+      </div>
     </aside>
   );
 }
