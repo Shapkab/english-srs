@@ -27,13 +27,19 @@ export function Composer() {
     }
   }, []);
 
+  // Debounce draft persistence so keystrokes don't hammer localStorage.
+  // 250ms matches typical typing burst length; pending writes flush on
+  // unmount via the cleanup return.
   useEffect(() => {
-    try {
-      if (text.length > 0) window.localStorage.setItem(DRAFT_KEY, text);
-      else window.localStorage.removeItem(DRAFT_KEY);
-    } catch {
-      // ignore
-    }
+    const handle = window.setTimeout(() => {
+      try {
+        if (text.length > 0) window.localStorage.setItem(DRAFT_KEY, text);
+        else window.localStorage.removeItem(DRAFT_KEY);
+      } catch {
+        // ignore
+      }
+    }, 250);
+    return () => window.clearTimeout(handle);
   }, [text]);
 
   const words = text.trim().length === 0 ? 0 : text.trim().split(/\s+/).length;
