@@ -1,6 +1,6 @@
 'use client';
 
-import { useEffect, useMemo, useState } from 'react';
+import { useEffect, useState } from 'react';
 import { useRouter, useSearchParams } from 'next/navigation';
 import type { Route } from 'next';
 import { Button } from '@/components/ui/Button';
@@ -20,6 +20,7 @@ export function LearningTargetsLibrary() {
   const initialSort = (search.get('sort') as SortKey | null) ?? 'due';
 
   const [targets, setTargets] = useState<LearningTargetCardData[] | null>(null);
+  const [categoryCounts, setCategoryCounts] = useState<Record<string, number>>({});
   const [error, setError] = useState<string | null>(null);
   const [sort, setSort] = useState<SortKey>(initialSort);
   const [activeCat, setActiveCat] = useState<IssueCategory | null>(
@@ -35,8 +36,14 @@ export function LearningTargetsLibrary() {
         if (activeCat) params.set('category', activeCat);
         const res = await fetchWithAuth(`/api/v1/learning-targets?${params.toString()}`);
         if (!res.ok) throw new Error('Could not load learning targets');
-        const body = (await res.json()) as { targets: LearningTargetCardData[] };
-        if (!cancelled) setTargets(body.targets);
+        const body = (await res.json()) as {
+          targets: LearningTargetCardData[];
+          categoryCounts?: Record<string, number>;
+        };
+        if (!cancelled) {
+          setTargets(body.targets);
+          setCategoryCounts(body.categoryCounts ?? {});
+        }
       } catch (e) {
         if (!cancelled) setError(e instanceof Error ? e.message : String(e));
       }
@@ -55,20 +62,10 @@ export function LearningTargetsLibrary() {
     router.replace((qs ? `/targets?${qs}` : '/targets') as Route, { scroll: false });
   }, [router, activeCat, sort]);
 
-  const counts = useMemo(() => {
-    if (!targets) return null;
-    const map = new Map<IssueCategory, number>();
-    for (const t of targets) {
-      const cat = isIssueCategory(t.category) ? t.category : null;
-      if (cat) map.set(cat, (map.get(cat) ?? 0) + 1);
-    }
-    return map;
-  }, [targets]);
-
-  // We fetch with category filter applied server-side. To show counts per chip
-  // we want the unfiltered counts; for MVP we count what we have in the result.
-  // When activeCat is null this is accurate; when filtered, the other chips
-  // show 0. Good enough for the MVP UI.
+  // categoryCounts come from the API and are computed over the
+  // unfiltered (status-only) set, so the chip counts stay correct
+  // when a category filter is active.
+  const allCount = Object.values(categoryCounts).reduce((a, b) => a + b, 0);
 
   return (
     <main className="px-10 py-9 max-w-[1280px]">
@@ -87,7 +84,7 @@ export function LearningTargetsLibrary() {
         <Chip
           active={activeCat === null}
           onClick={() => setActiveCat(null)}
-          count={targets?.length ?? null}
+          count={targets === null ? null : allCount}
         >
           All
         </Chip>
@@ -97,7 +94,7 @@ export function LearningTargetsLibrary() {
             active={activeCat === cat}
             onClick={() => setActiveCat((c) => (c === cat ? null : cat))}
             catClass={CATEGORY_COLOR[cat].cls}
-            count={counts?.get(cat) ?? null}
+            count={targets === null ? null : categoryCounts[cat] ?? 0}
           >
             {CATEGORY_LABEL[cat]}
           </Chip>

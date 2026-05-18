@@ -3,6 +3,7 @@ import { z } from 'zod';
 import { requireUserContext } from '@/lib/auth/user';
 import { toErrorResponse } from '@/lib/http/errors';
 import { masteryLevelsByLearningTarget } from '@/lib/srs/mastery';
+import { isIssueCategory } from '@/lib/ui/category-color';
 
 const querySchema = z.object({
   count: z.enum(['0', '1']).optional(),
@@ -44,6 +45,17 @@ export async function GET(request: Request) {
       .order('last_seen_at', { ascending: false })
       .limit(200);
     if (error) throw error;
+
+    // Count per category over the unfiltered (status-only) set so the
+    // chip counts in the UI stay correct when a category filter is
+    // active. Only canonical categories are counted; unknown text
+    // values are skipped.
+    const categoryCounts: Record<string, number> = {};
+    for (const t of targets ?? []) {
+      if (t.category && isIssueCategory(t.category)) {
+        categoryCounts[t.category] = (categoryCounts[t.category] ?? 0) + 1;
+      }
+    }
 
     // Filter category client-side if provided (categories are text in DB)
     const filtered = params.category
@@ -116,7 +128,7 @@ export async function GET(request: Request) {
       });
     }
 
-    return NextResponse.json({ targets: result });
+    return NextResponse.json({ targets: result, categoryCounts });
   } catch (error) {
     return toErrorResponse(error, request);
   }
