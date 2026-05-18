@@ -393,10 +393,18 @@ function ReviewChrome(props: ChromeProps) {
             {current} / {total} · {formatClock(props.elapsedMs)}
           </span>
         </div>
-        <div className="flex items-center gap-1 max-w-[360px]">
+        <div
+          className="flex items-center gap-1 max-w-[360px]"
+          role="progressbar"
+          aria-valuenow={current}
+          aria-valuemin={1}
+          aria-valuemax={total}
+          aria-label="Review progress"
+        >
           {Array.from({ length: total }, (_, i) => (
             <span
               key={i}
+              aria-hidden
               className={cn(
                 'h-1 w-6 rounded-full',
                 i < current - 1
@@ -405,10 +413,6 @@ function ReviewChrome(props: ChromeProps) {
                     ? 'bg-ink'
                     : 'bg-line-soft',
               )}
-              role="progressbar"
-              aria-valuenow={current}
-              aria-valuemin={1}
-              aria-valuemax={total}
             />
           ))}
         </div>
