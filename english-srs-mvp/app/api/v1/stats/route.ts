@@ -93,6 +93,22 @@ export async function GET(request: Request) {
     const retentionPrev = retention(reviewsPrev30);
     const retentionDelta = retention30d - retentionPrev;
 
+    // 14-day streak: bucket reviews by server-local day, oldest -> newest.
+    // The last entry is "today"; the user can light up the rest by reviewing.
+    const todayStart = new Date(now.getFullYear(), now.getMonth(), now.getDate());
+    const daysWithReviews = new Set<string>();
+    for (const r of reviews) {
+      const d = new Date(r.created_at);
+      const key = `${d.getFullYear()}-${d.getMonth()}-${d.getDate()}`;
+      daysWithReviews.add(key);
+    }
+    const streak: boolean[] = [];
+    for (let i = 13; i >= 0; i--) {
+      const day = new Date(todayStart.getTime() - i * DAY_MS);
+      const key = `${day.getFullYear()}-${day.getMonth()}-${day.getDate()}`;
+      streak.push(daysWithReviews.has(key));
+    }
+
     return NextResponse.json({
       activeTargets,
       activeTargetsDeltaWeek,
@@ -100,6 +116,7 @@ export async function GET(request: Request) {
       masteredDeltaPct,
       retention30d,
       retentionDelta,
+      streak,
     });
   } catch (error) {
     return toErrorResponse(error, request);

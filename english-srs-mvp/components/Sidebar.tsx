@@ -61,14 +61,18 @@ export function Sidebar({
           <div className="flex gap-1">
             {streak.map((active, i) => {
               const isToday = i === streak.length - 1;
+              // Today is peach only when the user actually reviewed
+              // today; an inactive "today" stays line-soft so an empty
+              // streak block reads as empty.
+              const colorClass = isToday
+                ? active
+                  ? 'bg-peach'
+                  : 'bg-line-soft'
+                : active
+                  ? 'bg-sage'
+                  : 'bg-line-soft';
               return (
-                <span
-                  key={i}
-                  className={cn(
-                    'h-[14px] w-[14px] rounded',
-                    isToday ? 'bg-peach' : active ? 'bg-sage' : 'bg-line-soft',
-                  )}
-                />
+                <span key={i} className={cn('h-[14px] w-[14px] rounded', colorClass)} />
               );
             })}
           </div>

@@ -14,16 +14,23 @@ interface ShellCounts {
   targets: number | null;
 }
 
+// Length 14; the final entry is "today" (peach in Sidebar). All-false
+// keeps the streak block visible but greyed-out for users with no
+// history.
+const EMPTY_STREAK: boolean[] = Array.from({ length: 14 }, () => false);
+
 export function AppShell({ children }: AppShellProps) {
   const [counts, setCounts] = useState<ShellCounts>({ due: null, targets: null });
+  const [streak, setStreak] = useState<boolean[]>(EMPTY_STREAK);
 
   useEffect(() => {
     let cancelled = false;
     async function load() {
       try {
-        const [queueRes, targetsRes] = await Promise.all([
+        const [queueRes, targetsRes, statsRes] = await Promise.all([
           fetchWithAuth('/api/v1/review-queue'),
           fetchWithAuth('/api/v1/learning-targets?count=1'),
+          fetchWithAuth('/api/v1/stats'),
         ]);
         if (cancelled) return;
         if (queueRes.ok) {
@@ -34,8 +41,14 @@ export function AppShell({ children }: AppShellProps) {
           const body = (await targetsRes.json()) as { total: number };
           setCounts((c) => ({ ...c, targets: body.total }));
         }
+        if (statsRes.ok) {
+          const body = (await statsRes.json()) as { streak?: boolean[] };
+          if (Array.isArray(body.streak) && body.streak.length === 14) {
+            setStreak(body.streak);
+          }
+        }
       } catch {
-        // ignore
+        // ignore — the shell stays usable without these numbers
       }
     }
     void load();
@@ -43,10 +56,6 @@ export function AppShell({ children }: AppShellProps) {
       cancelled = true;
     };
   }, []);
-
-  // Simple, defensible streak placeholder: assume today is the only active day,
-  // pad with line-soft. A real implementation would derive this from reviews.
-  const streak = Array.from({ length: 14 }, (_, i) => i === 13);
 
   return (
     <AuthGate>
