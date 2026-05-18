@@ -2,6 +2,7 @@ import { NextResponse } from 'next/server';
 import { requireUserContext } from '@/lib/auth/user';
 import { uuidParam } from '@/lib/validators/path-params';
 import { HttpError, toErrorResponse } from '@/lib/http/errors';
+import { masteryLevelsByLearningTarget } from '@/lib/srs/mastery';
 
 export async function GET(request: Request, context: { params: Promise<{ submissionId: string }> }) {
   try {
@@ -67,6 +68,7 @@ export async function GET(request: Request, context: { params: Promise<{ submiss
           .in('id', ltIds)
           .eq('user_id', userId);
         if (ltErr) throw ltErr;
+        const masteryByLt = await masteryLevelsByLearningTarget(supabase, userId, ltIds);
         for (const t of lts ?? []) {
           ltById[t.id] = {
             id: t.id,
@@ -74,7 +76,7 @@ export async function GET(request: Request, context: { params: Promise<{ submiss
             category: t.category,
             seenCount: t.seen_count ?? 1,
             firstSeenAt: t.first_seen_at,
-            masteryLevel: 0,
+            masteryLevel: masteryByLt[t.id] ?? 0,
           };
         }
       }

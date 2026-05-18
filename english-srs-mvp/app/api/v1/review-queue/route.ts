@@ -2,6 +2,7 @@ import { NextResponse } from 'next/server';
 import { z } from 'zod';
 import { requireUserContext } from '@/lib/auth/user';
 import { toErrorResponse } from '@/lib/http/errors';
+import { masteryLevelsByLearningTarget } from '@/lib/srs/mastery';
 
 const relatedLearningTargetSchema = z.object({
   id: z.string().uuid(),
@@ -48,7 +49,7 @@ export async function GET(request: Request) {
     if (error) throw error;
 
     const parsedRows = z.array(reviewQueueRowSchema).parse(data ?? []);
-    const cards = parsedRows
+    const draft = parsedRows
       .map((row) => {
         const card = Array.isArray(row.cards) ? row.cards[0] ?? null : row.cards;
         if (!card) return null;
@@ -68,18 +69,29 @@ export async function GET(request: Request) {
                 title: lt.display_title,
                 category: lt.category,
                 seenCount: lt.seen_count ?? 1,
-                masteryLevel: 0,
               }
             : null,
         };
       })
-      .filter((c): c is NonNullable<typeof c> => c !== null)
+      .filter((c): c is NonNullable<typeof c> => c !== null);
+
+    const ltIds = Array.from(
+      new Set(draft.map((c) => c.learningTarget?.id).filter((id): id is string => !!id)),
+    );
+    const masteryByLt = await masteryLevelsByLearningTarget(supabase, userId, ltIds);
+
+    const cards = draft
       .sort((a, b) => {
         if (a.dueAt < b.dueAt) return -1;
         if (a.dueAt > b.dueAt) return 1;
         return b.priority - a.priority;
       })
-      .map(({ priority: _priority, ...rest }) => rest);
+      .map(({ priority: _priority, learningTarget, ...rest }) => ({
+        ...rest,
+        learningTarget: learningTarget
+          ? { ...learningTarget, masteryLevel: masteryByLt[learningTarget.id] ?? 0 }
+          : null,
+      }));
 
     return NextResponse.json({ cards });
   } catch (error) {

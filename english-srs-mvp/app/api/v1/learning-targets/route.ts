@@ -2,6 +2,7 @@ import { NextResponse } from 'next/server';
 import { z } from 'zod';
 import { requireUserContext } from '@/lib/auth/user';
 import { toErrorResponse } from '@/lib/http/errors';
+import { masteryLevelsByLearningTarget } from '@/lib/srs/mastery';
 
 const querySchema = z.object({
   count: z.enum(['0', '1']).optional(),
@@ -77,8 +78,11 @@ export async function GET(request: Request) {
       }
     }
 
+    const masteryByLt = await masteryLevelsByLearningTarget(supabase, userId, ids);
+
     const result = filtered.map((t) => {
       const counts = cardsPerTarget[t.id] ?? { total: 0, active: 0 };
+      const masteryLevel = masteryByLt[t.id] ?? 0;
       return {
         id: t.id,
         canonicalKey: t.canonical_key,
@@ -87,8 +91,8 @@ export async function GET(request: Request) {
         subcategory: t.subcategory,
         explanationShort: t.explanation_short,
         status: t.status,
-        masteryScore: 0,
-        masteryLevel: 0,
+        masteryScore: masteryLevel * 20,
+        masteryLevel,
         seenCount: t.seen_count,
         cardsTotal: counts.total,
         cardsActive: counts.active,
@@ -99,7 +103,7 @@ export async function GET(request: Request) {
     });
 
     if (params.sort === 'mastery') {
-      result.sort((a, b) => a.masteryScore - b.masteryScore);
+      result.sort((a, b) => a.masteryLevel - b.masteryLevel);
     } else if (params.sort === 'recent') {
       result.sort((a, b) => (b.lastSeenAt > a.lastSeenAt ? 1 : -1));
     } else {
