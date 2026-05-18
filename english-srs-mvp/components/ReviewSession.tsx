@@ -27,7 +27,6 @@ const REVIEW_DONE_ROUTE = '/review/done' as Route;
 const UNAUTHORIZED_HINT = 'Your session expired';
 
 const AUTO_ADVANCE_KEY = 'plait:autoAdvance';
-const AUTO_ADVANCE_MS_KEY = 'plait:autoAdvanceMs';
 const DEFAULT_AUTO_ADVANCE_MS = 2000;
 
 function safeTrack(name: string, payload: Record<string, unknown>) {
@@ -57,6 +56,20 @@ export default function ReviewSession() {
   const [elapsedMs, setElapsedMs] = useState(0);
   const [autoAdvance, setAutoAdvance] = useState(false);
   const [autoAdvanceMs] = useState(DEFAULT_AUTO_ADVANCE_MS);
+  const autoAdvanceRef = useRef(autoAdvance);
+  autoAdvanceRef.current = autoAdvance;
+  const [pendingAutoRating, setPendingAutoRating] = useState<Rating | null>(null);
+  const pendingTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+
+  const clearPendingAuto = useCallback(() => {
+    if (pendingTimerRef.current !== null) {
+      clearTimeout(pendingTimerRef.current);
+      pendingTimerRef.current = null;
+    }
+    setPendingAutoRating(null);
+  }, []);
+
+  useEffect(() => () => clearPendingAuto(), [clearPendingAuto]);
 
   useEffect(() => {
     try {
@@ -139,6 +152,28 @@ export default function ReviewSession() {
     })();
   }, [state.phase]);
 
+  // Rate handler. With auto-advance ON, defers dispatch by autoAdvanceMs
+  // and shows a cancelable ring on the pressed button. Pressing another
+  // rating pre-empts the timer; pressing Esc cancels and stays on
+  // showing_answer.
+  const triggerRate = useCallback(
+    (rating: Rating) => {
+      if (!autoAdvanceRef.current) {
+        dispatch({ type: 'submit_rating', rating, now: Date.now() });
+        return;
+      }
+      if (pendingTimerRef.current !== null) {
+        clearTimeout(pendingTimerRef.current);
+      }
+      setPendingAutoRating(rating);
+      pendingTimerRef.current = setTimeout(() => {
+        pendingTimerRef.current = null;
+        dispatch({ type: 'submit_rating', rating, now: Date.now() });
+      }, autoAdvanceMs);
+    },
+    [autoAdvanceMs],
+  );
+
   // Hotkeys
   useEffect(() => {
     function onKey(event: KeyboardEvent) {
@@ -148,6 +183,11 @@ export default function ReviewSession() {
       }
       const phase = stateRef.current.phase;
       if (event.key === 'Escape') {
+        if (pendingTimerRef.current !== null) {
+          event.preventDefault();
+          clearPendingAuto();
+          return;
+        }
         setFeedbackOpen(false);
         return;
       }
@@ -170,12 +210,23 @@ export default function ReviewSession() {
       const rating = map[event.key];
       if (rating !== undefined) {
         event.preventDefault();
-        dispatch({ type: 'submit_rating', rating, now: Date.now() });
+        triggerRate(rating);
       }
     }
     window.addEventListener('keydown', onKey);
     return () => window.removeEventListener('keydown', onKey);
-  }, []);
+  }, [clearPendingAuto, triggerRate]);
+
+  // Clear the auto-advance pending state once the reducer has moved
+  // past the answer/submitting pair. The ring on the rated button stays
+  // visible through submitting_rating via state.phase.rating; we only
+  // clear when we've actually advanced.
+  useEffect(() => {
+    const kind = state.phase.kind;
+    if (kind !== 'showing_answer' && kind !== 'submitting_rating' && kind !== 'rating_error') {
+      clearPendingAuto();
+    }
+  }, [state.phase.kind, clearPendingAuto]);
 
   useEffect(() => {
     if (state.phase.kind === 'done' && !doneLoggedRef.current) {
@@ -203,9 +254,12 @@ export default function ReviewSession() {
     dispatch({ type: 'feedback_suspended', cardId, now: Date.now() });
   }, []);
 
-  const handleRate = useCallback((rating: Rating) => {
-    dispatch({ type: 'submit_rating', rating, now: Date.now() });
-  }, []);
+  const handleRate = useCallback(
+    (rating: Rating) => {
+      triggerRate(rating);
+    },
+    [triggerRate],
+  );
 
   const handleReveal = useCallback(() => {
     dispatch({ type: 'reveal' });
@@ -241,6 +295,7 @@ export default function ReviewSession() {
       onTryAgain={() => dispatch({ type: 'try_again_after_queue_error' })}
       feedbackOpen={feedbackOpen}
       onCloseFeedback={() => setFeedbackOpen(false)}
+      pendingAutoRating={pendingAutoRating}
     />
   );
 }
@@ -258,6 +313,7 @@ interface ChromeProps {
   onTryAgain: () => void;
   feedbackOpen: boolean;
   onCloseFeedback: () => void;
+  pendingAutoRating: Rating | null;
 }
 
 function ReviewChrome(props: ChromeProps) {
@@ -313,7 +369,11 @@ function ReviewChrome(props: ChromeProps) {
   const card = phase.cards[phase.index];
   const phaseLabel: 'question' | 'answer' = phase.kind === 'showing_question' ? 'question' : 'answer';
   const busy = phase.kind === 'submitting_rating';
-  const pendingRating = busy ? phase.rating : null;
+  // Auto-advance pending rating wins over busy: during the wait the
+  // reducer is still in showing_answer so we surface the pending button.
+  // Once the timer fires and submitting_rating starts, the busy path
+  // keeps the same button highlighted seamlessly.
+  const pendingRating = props.pendingAutoRating ?? (busy ? phase.rating : null);
   const total = phase.cards.length;
   const current = phase.index + 1;
   const leftAfter = total - current;
