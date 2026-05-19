@@ -174,3 +174,29 @@ describe('normalizeIssueToLearningTarget — adversarial canonicalization', () =
     expect(nbsp.canonicalKey).toBe(regular.canonicalKey);
   });
 });
+
+
+describe('unicode edge cases (E9)', () => {
+  it('removes zero-width characters from canonicalKey', () => {
+    const out = normalizeIssueToLearningTarget(
+      makeIssue({ category: 'collocation', correctedText: 'test\u200Bword' }),
+    );
+    expect(out.canonicalKey).not.toContain('\u200B');
+    expect(out.canonicalKey).toBe('collocation:testword');
+  });
+
+  it('removes control characters', () => {
+    const out = normalizeIssueToLearningTarget(
+      makeIssue({ category: 'collocation', correctedText: 'test\u0000word' }),
+    );
+    expect(out.canonicalKey).not.toContain('\u0000');
+    expect(out.canonicalKey).toBe('collocation:testword');
+  });
+
+  it('normalizes non-breaking space to a regular space in displayTitle', () => {
+    const out = normalizeIssueToLearningTarget(
+      makeIssue({ category: 'collocation', correctedText: 'test\u00A0word' }),
+    );
+    expect(out.displayTitle).toBe('test word');
+  });
+});
