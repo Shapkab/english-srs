@@ -22,7 +22,7 @@ export async function GET(request: Request) {
     const monthStart = startOfMonth(now).toISOString();
     const prevMonthStart = startOfPrevMonth(now).toISOString();
 
-    const [activeRes, newThisWeekRes, masteredRes, masteredAllRes, reviewsRes] = await Promise.all([
+    const [activeRes, newThisWeekRes, masteredRes, masteredAllRes, reviewsRes, srsRes] = await Promise.all([
       supabase
         .from('learning_targets')
         .select('id', { count: 'exact', head: true })
@@ -50,6 +50,12 @@ export async function GET(request: Request) {
         .select('rating, created_at')
         .eq('user_id', userId)
         .gte('created_at', sixtyDaysAgo),
+      supabase
+        .from('srs_state')
+        .select('repetition, lapse_count, cards!inner(status)')
+        .eq('user_id', userId)
+        .eq('cards.status', 'active')
+        .lte('due_at', now.toISOString()),
     ]);
 
     if (activeRes.error) throw activeRes.error;
@@ -57,6 +63,7 @@ export async function GET(request: Request) {
     if (masteredRes.error) throw masteredRes.error;
     if (masteredAllRes.error) throw masteredAllRes.error;
     if (reviewsRes.error) throw reviewsRes.error;
+    if (srsRes.error) throw srsRes.error;
 
     const activeTargets = activeRes.count ?? 0;
     const activeTargetsDeltaWeek = newThisWeekRes.count ?? 0;
@@ -109,6 +116,22 @@ export async function GET(request: Request) {
       streak.push(daysWithReviews.has(key));
     }
 
+    // Classify due active cards by SM-2 state. Buckets:
+    //   repetition = 0                       -> new
+    //   lapse_count > 0 && repetition < 3    -> relearning
+    //   repetition < 3 (no lapses)           -> learning
+    //   repetition >= 3                      -> review
+    // Sums to the due queue length; matches the queue handler's filters
+    // (cards.status='active', srs_state.due_at <= now).
+    const cardBreakdown = { new: 0, learning: 0, review: 0, relearning: 0 };
+    for (const row of srsRes.data ?? []) {
+      const r = row as { repetition: number; lapse_count: number };
+      if (r.repetition === 0) cardBreakdown.new += 1;
+      else if (r.lapse_count > 0 && r.repetition < 3) cardBreakdown.relearning += 1;
+      else if (r.repetition < 3) cardBreakdown.learning += 1;
+      else cardBreakdown.review += 1;
+    }
+
     return NextResponse.json({
       activeTargets,
       activeTargetsDeltaWeek,
@@ -117,6 +140,7 @@ export async function GET(request: Request) {
       retention30d,
       retentionDelta,
       streak,
+      cardBreakdown,
     });
   } catch (error) {
     return toErrorResponse(error, request);
