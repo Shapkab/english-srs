@@ -38,8 +38,7 @@ export async function processSubmission(params: { submissionId: string; userId: 
     .slice(0, 2)
     .map(({ index }) => index);
 
-  const cardCandidates: Array<{ issueIndex: number; candidate: CardCandidate }> = [];
-  for (const issueIndex of selectedIssueIndices) {
+  const cardCandidatePromises = selectedIssueIndices.map(async (issueIndex) => {
     const normalized = normalizedTargets[issueIndex];
     const candidates = await generateCardCandidates({
       learningTargetTitle: normalized.displayTitle,
@@ -48,8 +47,12 @@ export async function processSubmission(params: { submissionId: string; userId: 
       sourceSentence: analysis.correctedText,
     });
     const top = [...candidates].sort((a, b) => b.priority - a.priority)[0];
-    if (top) cardCandidates.push({ issueIndex, candidate: top });
-  }
+    return top ? { issueIndex, candidate: top } : null;
+  });
+  const cardCandidateResults = await Promise.all(cardCandidatePromises);
+  const cardCandidates = cardCandidateResults.filter(
+    (r): r is { issueIndex: number; candidate: CardCandidate } => r !== null,
+  );
 
   const rpcArgs = {
     p_submission_id: submissionId,
