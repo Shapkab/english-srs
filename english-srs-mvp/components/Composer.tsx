@@ -9,11 +9,13 @@ import { Toast } from '@/components/ui/Toast';
 import { fetchWithAuth } from '@/lib/api/client';
 import { toUserMessage, type ErrorPayload } from '@/lib/api/error-messages';
 
-const DRAFT_KEY = 'plait:draft';
 // Brief delay so users see the success toast before the redirect tears
 // the Composer down. Long enough to register, short enough not to feel
 // like a stall.
 const REDIRECT_AFTER_SUCCESS_MS = 1200;
+// Match the prior localStorage debounce so the network-write cadence
+// feels identical to the old behavior.
+const DRAFT_SAVE_DEBOUNCE_MS = 250;
 
 export function Composer() {
   const router = useRouter();
@@ -22,29 +24,52 @@ export function Composer() {
   const [error, setError] = useState<string | null>(null);
   const [toastOpen, setToastOpen] = useState(false);
   const textareaRef = useRef<HTMLTextAreaElement>(null);
+  // Track hydration so the debounced PUT doesn't fire with the empty
+  // initial state and overwrite the server's draft.
+  const hydratedRef = useRef(false);
 
-  // Hydrate draft after mount to avoid SSR/CSR mismatch.
+  // Hydrate draft from the server after mount. Network errors are
+  // swallowed — drafts are a nice-to-have UX, not a primary action.
   useEffect(() => {
-    try {
-      const saved = window.localStorage.getItem(DRAFT_KEY);
-      if (saved) setText(saved);
-    } catch {
-      // ignore
-    }
-  }, []);
-
-  // Debounce draft persistence so keystrokes don't hammer localStorage.
-  // 250ms matches typical typing burst length; pending writes flush on
-  // unmount via the cleanup return.
-  useEffect(() => {
-    const handle = window.setTimeout(() => {
+    let cancelled = false;
+    (async () => {
       try {
-        if (text.length > 0) window.localStorage.setItem(DRAFT_KEY, text);
-        else window.localStorage.removeItem(DRAFT_KEY);
+        const res = await fetchWithAuth('/api/v1/drafts');
+        if (!cancelled && res.ok) {
+          const body = (await res.json()) as { draft: { content: string } | null };
+          if (body.draft?.content) setText(body.draft.content);
+        }
       } catch {
         // ignore
+      } finally {
+        if (!cancelled) hydratedRef.current = true;
       }
-    }, 250);
+    })();
+    return () => {
+      cancelled = true;
+    };
+  }, []);
+
+  // Debounce draft persistence so keystrokes don't hammer the API.
+  // PUT for non-empty, DELETE for empty. Network errors swallowed.
+  useEffect(() => {
+    if (!hydratedRef.current) return;
+    const handle = window.setTimeout(() => {
+      void (async () => {
+        try {
+          if (text.length > 0) {
+            await fetchWithAuth('/api/v1/drafts', {
+              method: 'PUT',
+              body: JSON.stringify({ content: text }),
+            });
+          } else {
+            await fetchWithAuth('/api/v1/drafts', { method: 'DELETE' });
+          }
+        } catch {
+          // ignore
+        }
+      })();
+    }, DRAFT_SAVE_DEBOUNCE_MS);
     return () => window.clearTimeout(handle);
   }, [text]);
 
@@ -66,11 +91,9 @@ export function Composer() {
         throw new Error(toUserMessage(body, res.status));
       }
       const body = (await res.json()) as { submissionId: string };
-      try {
-        window.localStorage.removeItem(DRAFT_KEY);
-      } catch {
-        // ignore
-      }
+      // Fire-and-forget DELETE — the redirect has already happened by
+      // the time this resolves; errors are not user-actionable.
+      void fetchWithAuth('/api/v1/drafts', { method: 'DELETE' }).catch(() => {});
       setToastOpen(true);
       window.setTimeout(
         () => router.push(`/submissions/${body.submissionId}` as Route),
