@@ -4,7 +4,7 @@ import Link from 'next/link';
 import type { Route } from 'next';
 import { usePathname, useRouter } from 'next/navigation';
 import { useState } from 'react';
-import { Calendar, Layers, Crosshair, LogOut } from 'lucide-react';
+import { Calendar, Layers, Crosshair, Inbox, LogOut } from 'lucide-react';
 import { cn } from '@/lib/ui/cn';
 import { getBrowserSupabase } from '@/lib/supabase/browser';
 
@@ -42,6 +42,7 @@ export function Sidebar({ dueCount = null, targetCount = null, streak }: Sidebar
     { href: '/dashboard' as Route, label: 'Today', Icon: Calendar, count: dueCount },
     { href: '/review' as Route, label: 'Review', Icon: Layers, count: dueCount },
     { href: '/targets' as Route, label: 'Learning targets', Icon: Crosshair, count: targetCount },
+    { href: '/submissions' as Route, label: 'Submissions', Icon: Inbox, count: null },
   ];
 
   return (
