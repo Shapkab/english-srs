@@ -5,6 +5,8 @@ import { getSupabaseAdmin } from '@/lib/db/server';
 import { trackEvent } from '@/lib/analytics/events';
 import { toErrorResponse } from '@/lib/http/errors';
 
+/** Maximum submissions per user per hour. Balances active practice
+ *  against cost (each submission triggers AI analysis at ~$0.01-0.05). */
 const RATE_LIMIT_SUBMISSIONS_PER_HOUR = 30;
 
 export async function POST(request: Request) {

@@ -5,8 +5,13 @@ import { getSupabaseAdmin } from '@/lib/db/server';
 import { processSubmission } from '@/lib/services/process-submission.service';
 import type { Database } from '@/lib/types/database.generated';
 
+/** Time after which a "processing" job is considered abandoned and can be reclaimed.
+ *  5 minutes balances recovery speed vs false positives on slow OpenAI calls. */
 export const STALE_CLAIM_MS = 5 * 60 * 1000;
+/** Idle sleep between poll cycles when no jobs are available.
+ *  3s keeps latency low without hammering the DB. */
 const POLL_IDLE_MS = 3000;
+/** Ceiling for exponential backoff on retryable failures (1 minute). */
 const MAX_BACKOFF_MS = 60_000;
 
 interface PendingJobRow {

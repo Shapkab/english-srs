@@ -7,6 +7,11 @@ export type MasteryLevel = 0 | 1 | 2 | 3 | 4 | 5;
 // belonging to the target, at most the last 10. Anything beyond 10 is
 // ignored.
 //
+// Why 10? Balances recency (recent performance matters most) with stability
+// (a single bad review shouldn't tank mastery). ~2-4 weeks of regular practice.
+// Why last 5 for the level calc? SM-2 research suggests recent performance is
+// most predictive of retention.
+//
 // Definition:
 //   - If 5+ ratings: count rating >= 3 in the last 5 reviews -> level 0-5.
 //   - If fewer: scale floor(successCount / total * 5).
