@@ -65,9 +65,11 @@ export async function masteryLevelsByLearningTarget(
     // Cheapest defect to catch: a misconfigured join silently returns
     // empty even when reviews exist. Warn (don't throw) so a working
     // route stays up while the join is investigated.
-    console.warn(
-      `[mastery] join returned empty for ${ltIds.length} targets — relationship may be misconfigured`,
-    );
+    if (process.env.NODE_ENV !== 'production') {
+      console.warn(
+        `[mastery] join returned empty for ${ltIds.length} targets — relationship may be misconfigured`,
+      );
+    }
     return Object.fromEntries(ltIds.map((id) => [id, 0 as MasteryLevel]));
   }
 
