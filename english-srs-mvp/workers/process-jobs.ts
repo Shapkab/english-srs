@@ -104,12 +104,21 @@ export async function processOneJob(supabase: SupabaseClient<Database>): Promise
   if (claimErr) throw claimErr;
   if (!job) return true;
 
+  const startMs = Date.now();
   try {
     if (job.type !== 'analyze_submission') {
       throw new Error(`Unsupported job type: ${job.type}`);
     }
     const { submissionId, userId } = job.payload as { submissionId: string; userId: string };
-    await processSubmission({ submissionId, userId });
+    const result = await processSubmission({ submissionId, userId });
+    const durationMs = Date.now() - startMs;
+    console.log('[worker] completed job', {
+      jobId: job.id,
+      submissionId,
+      durationMs,
+      issueCount: result.issueCount,
+      cardsCreated: result.createdCardIds.length,
+    });
 
     const { error: doneErr } = await supabase
       .from('jobs')
@@ -117,7 +126,8 @@ export async function processOneJob(supabase: SupabaseClient<Database>): Promise
       .eq('id', job.id);
     if (doneErr) throw doneErr;
   } catch (error) {
-    console.error('[worker] failed job', job.id, error);
+    const durationMs = Date.now() - startMs;
+    console.error('[worker] failed job', { jobId: job.id, durationMs, error });
     const isRetryable = classifyRetryable(error);
     const willRetry = isRetryable && job.attempts < job.max_attempts;
     const reason = error instanceof Error ? error.message : String(error);
