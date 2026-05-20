@@ -5,8 +5,13 @@ import { getSupabaseAdmin } from '@/lib/db/server';
 import { processSubmission } from '@/lib/services/process-submission.service';
 import type { Database } from '@/lib/types/database.generated';
 
+/** Time after which a "processing" job is considered abandoned and can be reclaimed.
+ *  5 minutes balances recovery speed vs false positives on slow OpenAI calls. */
 export const STALE_CLAIM_MS = 5 * 60 * 1000;
+/** Idle sleep between poll cycles when no jobs are available.
+ *  3s keeps latency low without hammering the DB. */
 const POLL_IDLE_MS = 3000;
+/** Ceiling for exponential backoff on retryable failures (1 minute). */
 const MAX_BACKOFF_MS = 60_000;
 
 interface PendingJobRow {
@@ -104,12 +109,21 @@ export async function processOneJob(supabase: SupabaseClient<Database>): Promise
   if (claimErr) throw claimErr;
   if (!job) return true;
 
+  const startMs = Date.now();
   try {
     if (job.type !== 'analyze_submission') {
       throw new Error(`Unsupported job type: ${job.type}`);
     }
     const { submissionId, userId } = job.payload as { submissionId: string; userId: string };
-    await processSubmission({ submissionId, userId });
+    const result = await processSubmission({ submissionId, userId });
+    const durationMs = Date.now() - startMs;
+    console.log('[worker] completed job', {
+      jobId: job.id,
+      submissionId,
+      durationMs,
+      issueCount: result.issueCount,
+      cardsCreated: result.createdCardIds.length,
+    });
 
     const { error: doneErr } = await supabase
       .from('jobs')
@@ -117,7 +131,8 @@ export async function processOneJob(supabase: SupabaseClient<Database>): Promise
       .eq('id', job.id);
     if (doneErr) throw doneErr;
   } catch (error) {
-    console.error('[worker] failed job', job.id, error);
+    const durationMs = Date.now() - startMs;
+    console.error('[worker] failed job', { jobId: job.id, durationMs, error });
     const isRetryable = classifyRetryable(error);
     const willRetry = isRetryable && job.attempts < job.max_attempts;
     const reason = error instanceof Error ? error.message : String(error);

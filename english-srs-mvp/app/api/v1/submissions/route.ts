@@ -3,8 +3,10 @@ import { createSubmissionSchema } from '@/lib/validators/api';
 import { requireUserContext } from '@/lib/auth/user';
 import { getSupabaseAdmin } from '@/lib/db/server';
 import { trackEvent } from '@/lib/analytics/events';
-import { HttpError, toErrorResponse } from '@/lib/http/errors';
+import { toErrorResponse } from '@/lib/http/errors';
 
+/** Maximum submissions per user per hour. Balances active practice
+ *  against cost (each submission triggers AI analysis at ~$0.01-0.05). */
 const RATE_LIMIT_SUBMISSIONS_PER_HOUR = 30;
 
 export async function POST(request: Request) {
@@ -22,7 +24,24 @@ export async function POST(request: Request) {
     if (rlErr) throw rlErr;
     const rl = rlData?.[0];
     if (!rl?.allowed) {
-      throw new HttpError(429, 'rate_limited');
+      const resetAtMs = rl?.reset_at ? new Date(rl.reset_at).getTime() : Date.now() + 3600_000;
+      const retryAfterSeconds = Math.max(1, Math.ceil((resetAtMs - Date.now()) / 1000));
+      return NextResponse.json(
+        {
+          code: 'rate_limited',
+          message: "You've reached your hourly submission limit.",
+          resetAt: rl?.reset_at ?? new Date(resetAtMs).toISOString(),
+        },
+        {
+          status: 429,
+          headers: {
+            'X-RateLimit-Limit': String(RATE_LIMIT_SUBMISSIONS_PER_HOUR),
+            'X-RateLimit-Remaining': '0',
+            'X-RateLimit-Reset': String(Math.ceil(resetAtMs / 1000)),
+            'Retry-After': String(retryAfterSeconds),
+          },
+        },
+      );
     }
 
     const { data: submission, error } = await supabase

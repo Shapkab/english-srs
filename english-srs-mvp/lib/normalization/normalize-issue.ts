@@ -1,6 +1,7 @@
 // Canonical-key normalization for LearningTarget dedupe.
 //
-// Today: NFKC + quote/whitespace canonicalization + lowercasing.
+// Today: NFKC + quote/whitespace canonicalization + lowercasing +
+// stripping of zero-width and control characters.
 //
 // Known gaps (intentional, deferred to a future PR):
 //   - No lemmatization. "go" / "goes" / "went" produce distinct keys for word_form.
@@ -14,11 +15,20 @@ import type { AnalysisIssueDTO, NormalizedLearningTarget } from '@/lib/types/dom
 function normalizeText(value: string): string {
   return value
     .normalize('NFKC')
+    // Remove zero-width characters
+    .replace(/[\u200B-\u200D\u2060\uFEFF]/g, '')
+    // Remove control characters (except common whitespace \t \n \r)
+    .replace(/[\u0000-\u0008\u000B\u000C\u000E-\u001F\u007F-\u009F]/g, '')
+    // Normalize curly quotes
     .replace(/[‘’‚‛]/g, "'")
     .replace(/[“”„‟]/g, '"')
+    // Normalize en/em dashes
     .replace(/[–—]/g, '-')
-    .replace(/ /g, ' ')
-    .toLowerCase()
+    // Non-breaking space -> regular space
+    .replace(/\u00A0/g, ' ')
+    // Locale-explicit lowercase for consistency across runtimes
+    .toLocaleLowerCase('en-US')
+    // Collapse whitespace
     .replace(/\s+/g, ' ')
     .trim();
 }

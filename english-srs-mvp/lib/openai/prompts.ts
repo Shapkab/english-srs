@@ -15,8 +15,22 @@ Rules:
 - Explanations must be short and direct.
 - Return only the required structured output.`;
 
+const MAX_USER_TEXT_LENGTH = 10_000;
+
+function sanitizeUserText(text: string): string {
+  return text
+    .slice(0, MAX_USER_TEXT_LENGTH)
+    .replace(/```/g, '\\`\\`\\`')
+    .replace(/<\/?[a-z_]+>/gi, (match) => `\\${match}`);
+}
+
 export function buildAnalysisUserPrompt(text: string): string {
-  return `Analyze this English text for learning purposes:\n\n${text}`;
+  const sanitized = sanitizeUserText(text);
+  return `Analyze this English text for learning purposes:
+<user_text>
+${sanitized}
+</user_text>
+Respond only with the structured JSON output.`;
 }
 
 export const CARD_GENERATION_SYSTEM_PROMPT = `You generate high-value spaced-repetition card candidates.
@@ -39,5 +53,12 @@ export function buildCardGenerationUserPrompt(input: {
   explanationShort: string;
   sourceSentence: string;
 }): string {
-  return `Create review cards for this learning target:\n\nTitle: ${input.learningTargetTitle}\nCategory: ${input.category}\nExplanation: ${input.explanationShort}\nSource sentence: ${input.sourceSentence}`;
+  const sanitized = sanitizeUserText(input.sourceSentence);
+  return `Create review cards for this learning target:
+Title: ${input.learningTargetTitle}
+Category: ${input.category}
+Explanation: ${input.explanationShort}
+<source_sentence>
+${sanitized}
+</source_sentence>`;
 }

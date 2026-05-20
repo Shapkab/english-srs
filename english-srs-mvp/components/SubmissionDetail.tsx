@@ -77,8 +77,10 @@ export function SubmissionDetail({ id }: { id: string }) {
     let cancelled = false;
     let timer: ReturnType<typeof setInterval> | null = null;
     async function poll() {
+      if (cancelled) return;
       try {
         const res = await fetchWithAuth(`/api/v1/submissions/${id}/analysis`);
+        if (cancelled) return;
         if (!res.ok) {
           const body = (await res.json().catch(() => ({}))) as ErrorPayload;
           throw new Error(toUserMessage(body, res.status));
@@ -104,7 +106,10 @@ export function SubmissionDetail({ id }: { id: string }) {
     timer = setInterval(poll, 2000);
     return () => {
       cancelled = true;
-      if (timer !== null) clearInterval(timer);
+      if (timer !== null) {
+        clearInterval(timer);
+        timer = null;
+      }
     };
   }, [id]);
 

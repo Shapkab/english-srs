@@ -4,6 +4,14 @@ import { normalizeIssueToLearningTarget } from '@/lib/normalization/normalize-is
 import { generateCardCandidates } from '@/lib/services/card-generation.service';
 import { ANALYSIS_SCHEMA_VERSION } from '@/lib/openai/schema-version';
 import type { CardCandidate } from '@/lib/types/domain';
+import type { Database, Json } from '@/lib/types/database.generated';
+
+type PersistArgs = Database['public']['Functions']['persist_submission_analysis']['Args'];
+
+// The interfaces we send (AnalysisIssueDTO, NormalizedLearningTarget, etc.)
+// are structurally JSON-compatible at runtime but lack the index signature
+// that the generated `Json` type requires. Cast through `unknown` once, here.
+const asJson = (value: unknown): Json => value as Json;
 
 interface PersistedRow {
   analysis_id: string;
@@ -38,8 +46,7 @@ export async function processSubmission(params: { submissionId: string; userId: 
     .slice(0, 2)
     .map(({ index }) => index);
 
-  const cardCandidates: Array<{ issueIndex: number; candidate: CardCandidate }> = [];
-  for (const issueIndex of selectedIssueIndices) {
+  const cardCandidatePromises = selectedIssueIndices.map(async (issueIndex) => {
     const normalized = normalizedTargets[issueIndex];
     const candidates = await generateCardCandidates({
       learningTargetTitle: normalized.displayTitle,
@@ -48,24 +55,28 @@ export async function processSubmission(params: { submissionId: string; userId: 
       sourceSentence: analysis.correctedText,
     });
     const top = [...candidates].sort((a, b) => b.priority - a.priority)[0];
-    if (top) cardCandidates.push({ issueIndex, candidate: top });
-  }
+    return top ? { issueIndex, candidate: top } : null;
+  });
+  const cardCandidateResults = await Promise.all(cardCandidatePromises);
+  const cardCandidates = cardCandidateResults.filter(
+    (r): r is { issueIndex: number; candidate: CardCandidate } => r !== null,
+  );
 
-  const rpcArgs = {
+  const rpcArgs: PersistArgs = {
     p_submission_id: submissionId,
     p_user_id: userId,
     p_model: process.env.OPENAI_MODEL_ANALYSIS ?? 'gpt-4.1-mini',
     p_corrected_text: analysis.correctedText,
-    p_summary: analysis.summary,
+    p_summary: analysis.summary ?? '',
     p_schema_version: ANALYSIS_SCHEMA_VERSION,
-    p_issues: analysis.issues,
-    p_normalized_targets: normalizedTargets,
-    p_card_candidates: cardCandidates,
+    p_issues: asJson(analysis.issues),
+    p_normalized_targets: asJson(normalizedTargets),
+    p_card_candidates: asJson(cardCandidates),
   };
 
   const { data: persistResult, error: persistError } = await supabase.rpc(
     'persist_submission_analysis',
-    rpcArgs as never,
+    rpcArgs,
   );
   if (persistError) throw persistError;
 

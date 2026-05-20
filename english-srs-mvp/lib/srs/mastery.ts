@@ -7,6 +7,11 @@ export type MasteryLevel = 0 | 1 | 2 | 3 | 4 | 5;
 // belonging to the target, at most the last 10. Anything beyond 10 is
 // ignored.
 //
+// Why 10? Balances recency (recent performance matters most) with stability
+// (a single bad review shouldn't tank mastery). ~2-4 weeks of regular practice.
+// Why last 5 for the level calc? SM-2 research suggests recent performance is
+// most predictive of retention.
+//
 // Definition:
 //   - If 5+ ratings: count rating >= 3 in the last 5 reviews -> level 0-5.
 //   - If fewer: scale floor(successCount / total * 5).
@@ -65,9 +70,11 @@ export async function masteryLevelsByLearningTarget(
     // Cheapest defect to catch: a misconfigured join silently returns
     // empty even when reviews exist. Warn (don't throw) so a working
     // route stays up while the join is investigated.
-    console.warn(
-      `[mastery] join returned empty for ${ltIds.length} targets — relationship may be misconfigured`,
-    );
+    if (process.env.NODE_ENV !== 'production') {
+      console.warn(
+        `[mastery] join returned empty for ${ltIds.length} targets — relationship may be misconfigured`,
+      );
+    }
     return Object.fromEntries(ltIds.map((id) => [id, 0 as MasteryLevel]));
   }
 
