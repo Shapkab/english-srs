@@ -68,7 +68,7 @@ suite('SM-2 TypeScript/SQL equivalence', () => {
       lapse_count: 0,
       due_at: new Date().toISOString(),
     });
-  });
+  }, 30_000);
 
   afterAll(async () => {
     if (!admin || !userId) return;
@@ -78,7 +78,7 @@ suite('SM-2 TypeScript/SQL equivalence', () => {
     } catch {
       // best-effort cleanup
     }
-  });
+  }, 30_000);
 
   const testCases: Array<{ state: SrsStateInput; rating: number; description: string }> = [
     { state: { repetition: 0, intervalDays: 0, easeFactor: 2.5, lapseCount: 0 }, rating: 1, description: 'new card, fail' },
