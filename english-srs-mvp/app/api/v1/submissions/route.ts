@@ -8,6 +8,9 @@ import { toErrorResponse } from '@/lib/http/errors';
 /** Maximum submissions per user per hour. Balances active practice
  *  against cost (each submission triggers AI analysis at ~$0.01-0.05). */
 const RATE_LIMIT_SUBMISSIONS_PER_HOUR = 30;
+/** Maximum submissions per user per rolling 24h. Caps worst-case daily
+ *  OpenAI spend on top of the hourly burst limit (M4). */
+const RATE_LIMIT_SUBMISSIONS_PER_DAY = 100;
 
 export async function POST(request: Request) {
   try {
@@ -15,6 +18,40 @@ export async function POST(request: Request) {
     const body = createSubmissionSchema.parse(await request.json());
 
     const admin = getSupabaseAdmin();
+
+    // Check the daily cap first so an hourly token is not consumed when the
+    // daily cap is already hit (M4).
+    const { data: dailyData, error: dailyErr } = await admin.rpc('check_and_consume_rate_limit', {
+      p_user_id: userId,
+      p_bucket: 'ai_daily',
+      p_max: RATE_LIMIT_SUBMISSIONS_PER_DAY,
+      p_window_seconds: 86400,
+    });
+    if (dailyErr) throw dailyErr;
+    const daily = dailyData?.[0];
+    if (!daily?.allowed) {
+      const resetAtMs = daily?.reset_at
+        ? new Date(daily.reset_at).getTime()
+        : Date.now() + 86400_000;
+      const retryAfterSeconds = Math.max(1, Math.ceil((resetAtMs - Date.now()) / 1000));
+      return NextResponse.json(
+        {
+          code: 'rate_limited',
+          message: "You've reached your daily submission limit.",
+          resetAt: daily?.reset_at ?? new Date(resetAtMs).toISOString(),
+        },
+        {
+          status: 429,
+          headers: {
+            'X-RateLimit-Limit': String(RATE_LIMIT_SUBMISSIONS_PER_DAY),
+            'X-RateLimit-Remaining': '0',
+            'X-RateLimit-Reset': String(Math.ceil(resetAtMs / 1000)),
+            'Retry-After': String(retryAfterSeconds),
+          },
+        },
+      );
+    }
+
     const { data: rlData, error: rlErr } = await admin.rpc('check_and_consume_rate_limit', {
       p_user_id: userId,
       p_bucket: 'submissions',
