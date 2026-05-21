@@ -1,7 +1,7 @@
 'use client';
 
 import { useState, useRef, useEffect, useCallback } from 'react';
-import { useRouter } from 'next/navigation';
+import { useRouter, useSearchParams } from 'next/navigation';
 import { Send, X } from 'lucide-react';
 import { fetchWithAuth } from '@/lib/api/client';
 import { toUserMessage, type ErrorPayload } from '@/lib/api/error-messages';
@@ -13,21 +13,29 @@ const MAX_LENGTH = 10_000;
 
 export function QuickComposer() {
   const router = useRouter();
+  const searchParams = useSearchParams();
   const textareaRef = useRef<HTMLTextAreaElement>(null);
   const [text, setText] = useState('');
   const [submitting, setSubmitting] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
-  // Restore draft on mount, then focus.
+  // On mount: prefer text shared via the Web Share Target (?text=), then
+  // strip the param from the URL; otherwise restore the saved draft.
   useEffect(() => {
-    try {
-      const saved = localStorage.getItem(DRAFT_KEY);
-      if (saved) setText(saved);
-    } catch {
-      // localStorage unavailable
+    const shared = searchParams.get('text');
+    if (shared) {
+      setText(shared);
+      window.history.replaceState({}, '', '/submit');
+    } else {
+      try {
+        const saved = localStorage.getItem(DRAFT_KEY);
+        if (saved) setText(saved);
+      } catch {
+        // localStorage unavailable
+      }
     }
     textareaRef.current?.focus();
-  }, []);
+  }, [searchParams]);
 
   // Persist draft on change.
   useEffect(() => {
