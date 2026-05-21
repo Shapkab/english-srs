@@ -114,7 +114,10 @@ suite('GET /api/v1/submissions/[id]/analysis — terminal-failure shape (D2)', (
     };
 
     expect(body.status).toBe('failed');
-    expect(body.failureReason).toBe(failureReason);
+    // failureReason is mapped to a user-safe string (L1) — the raw stored
+    // reason must never reach the client.
+    expect(body.failureReason).toBe('Analysis failed. Please try resubmitting.');
+    expect(body.failureReason).not.toContain(failureReason);
     expect(body.originalText).toBe(submittedText);
     expect(body.correctedText).toBeNull();
     expect(body.issues).toEqual([]);

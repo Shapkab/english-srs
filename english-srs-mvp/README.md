@@ -151,3 +151,16 @@ If you want to process a submission manually:
 curl -X POST http://localhost:3000/api/dev/process-submission/<submissionId> \
   -H "Authorization: Bearer <supabase-access-token>"
 ```
+
+## Worker operations
+
+- **Throughput ceiling.** `workers/process-jobs.ts` claims **one** job per
+  poll cycle and each job is two-or-more serial OpenAI calls (~5–30 s).
+  Realistic ceiling is a few jobs/min per worker process.
+- **Horizontal scaling.** Run more worker processes. Job claiming is an
+  optimistic guarded update (`status = 'pending'` precondition), so multiple
+  workers can run concurrently without claiming the same job twice.
+- **Dead-letter recovery.** Permanently failed jobs (`status = 'failed'`)
+  are surfaced by the `jobs_dead_letter` view — the human-recovery surface
+  for inspecting `last_error` and deciding whether to requeue or discard.
+  Like `jobs`, it is service-role / admin only.
