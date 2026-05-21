@@ -6,6 +6,7 @@ import { Send, X } from 'lucide-react';
 import { fetchWithAuth } from '@/lib/api/client';
 import { toUserMessage, type ErrorPayload } from '@/lib/api/error-messages';
 import { cn } from '@/lib/ui/cn';
+import { addToOfflineQueue } from '@/lib/offline/submission-queue';
 
 const DRAFT_KEY = 'plait:quick-draft';
 const MIN_LENGTH = 10;
@@ -58,6 +59,20 @@ export function QuickComposer() {
 
     setSubmitting(true);
     setError(null);
+
+    // Offline: stash the submission locally; OfflineSyncManager flushes it
+    // on reconnect.
+    if (!navigator.onLine) {
+      addToOfflineQueue(text.trim());
+      try {
+        localStorage.removeItem(DRAFT_KEY);
+      } catch {
+        // localStorage unavailable
+      }
+      router.push('/dashboard?offline=1');
+      return;
+    }
+
     try {
       const res = await fetchWithAuth('/api/v1/submissions', {
         method: 'POST',

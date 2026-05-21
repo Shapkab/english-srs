@@ -3,6 +3,7 @@ import type { Metadata, Viewport } from 'next';
 import { Instrument_Serif, Geist, Geist_Mono } from 'next/font/google';
 import React from 'react';
 import { ServiceWorkerRegistration } from '@/components/ServiceWorkerRegistration';
+import { OfflineSyncManager } from '@/components/OfflineSyncManager';
 
 const serif = Instrument_Serif({
   weight: '400',
@@ -52,6 +53,7 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
       <body className="bg-bg text-ink font-sans antialiased">
         {children}
         <ServiceWorkerRegistration />
+        <OfflineSyncManager />
       </body>
     </html>
   );
