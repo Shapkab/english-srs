@@ -5,6 +5,13 @@ import { HttpError, toErrorResponse } from '@/lib/http/errors';
 import { masteryLevelsByLearningTarget } from '@/lib/srs/mastery';
 import { computeLinkKind } from '@/lib/ui/link-kind';
 
+/** Map an internal failure to a user-safe message. The raw failure_reason
+ *  can carry OpenAI/SDK internals, so it must never reach the client (L1).
+ *  The raw text remains stored server-side for debugging. */
+function safeFailureReason(status: string): string | null {
+  return status === 'failed' ? 'Analysis failed. Please try resubmitting.' : null;
+}
+
 export async function GET(request: Request, context: { params: Promise<{ submissionId: string }> }) {
   try {
     const { userId, supabase } = await requireUserContext(request);
@@ -95,7 +102,7 @@ export async function GET(request: Request, context: { params: Promise<{ submiss
 
     return NextResponse.json({
       status: submission.status,
-      failureReason: submission.failure_reason,
+      failureReason: safeFailureReason(submission.status),
       originalText: submission.original_text,
       createdAt: submission.created_at,
       correctedText: analysis?.corrected_text ?? null,
