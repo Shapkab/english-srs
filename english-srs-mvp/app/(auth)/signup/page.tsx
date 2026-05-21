@@ -43,7 +43,7 @@ export default function SignupPage() {
   return (
     <>
       <h1 className="font-serif text-[32px] leading-none mb-1">Sign up</h1>
-      <p className="text-[13px] text-ink-soft mb-6">Create your Plait account.</p>
+      <p className="text-[13px] text-ink-soft mb-6">Create your English SRS account.</p>
       <form onSubmit={onSubmit} className="grid gap-3.5">
         <label className="grid gap-1.5">
           <span className="text-[12px] text-ink-soft">Email</span>

@@ -9,7 +9,7 @@ export default function AuthLayout({ children }: { children: ReactNode }) {
             <span className="absolute inset-0 rounded-full border border-sage-deep/70" />
             <span className="h-2 w-2 rounded-full bg-peach-deep" />
           </span>
-          <span className="font-serif text-[22px] leading-none">Plait</span>
+          <span className="font-serif text-[22px] leading-none">English SRS</span>
         </div>
         {children}
       </div>

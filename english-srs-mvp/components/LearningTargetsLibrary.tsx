@@ -71,7 +71,7 @@ export function LearningTargetsLibrary() {
     <main className="px-10 py-9 max-w-[1280px]">
       <Topbar
         title="Learning targets"
-        subtitle="The patterns Plait is tracking for you — derived from your own writing, not a fixed syllabus."
+        subtitle="The patterns English SRS is tracking for you — derived from your own writing, not a fixed syllabus."
         actions={
           <>
             <Button variant="ghost" disabled>Export</Button>
@@ -111,7 +111,7 @@ export function LearningTargetsLibrary() {
       ) : targets.length === 0 ? (
         <div className="rounded-lg border border-line bg-bg-card p-12 text-center">
           <p className="text-[13px] text-ink-faint">
-            No learning targets yet. Submit some text and Plait will surface the patterns it sees.
+            No learning targets yet. Submit some text and English SRS will surface the patterns it sees.
           </p>
         </div>
       ) : (
