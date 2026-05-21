@@ -57,7 +57,7 @@ export function Sidebar({ dueCount = null, targetCount = null, streak }: Sidebar
           <span className="absolute inset-0 rounded-full border border-sage-deep/70" />
           <span className="h-2 w-2 rounded-full bg-peach-deep" />
         </span>
-        <span className="font-serif text-[22px] leading-none">Plait</span>
+        <span className="font-serif text-[22px] leading-none">English SRS</span>
         <span className="ml-auto font-mono text-[10px] uppercase tracking-[0.14em] text-ink-faint">v0.1</span>
       </div>
 

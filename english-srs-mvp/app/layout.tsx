@@ -25,7 +25,7 @@ const mono = Geist_Mono({
 });
 
 export const metadata: Metadata = {
-  title: 'Plait',
+  title: 'English SRS',
   description: 'Personal English coaching from your own writing.',
   manifest: '/manifest.json',
   appleWebApp: {

@@ -97,7 +97,7 @@ export function MobileNav({ dueCount = null, targetCount = null }: MobileNavProp
             <span className="absolute inset-0 rounded-full border border-sage-deep/70" />
             <span className="h-1.5 w-1.5 rounded-full bg-peach-deep" />
           </span>
-          <span className="font-serif text-[18px] leading-none">Plait</span>
+          <span className="font-serif text-[18px] leading-none">English SRS</span>
         </Link>
         <button
           ref={triggerRef}
@@ -133,7 +133,7 @@ export function MobileNav({ dueCount = null, targetCount = null }: MobileNavProp
         )}
       >
         <div className="flex items-center justify-between px-5 py-4 border-b border-line-soft">
-          <span className="font-serif text-[20px] leading-none">Plait</span>
+          <span className="font-serif text-[20px] leading-none">English SRS</span>
           <button
             ref={closeBtnRef}
             type="button"
