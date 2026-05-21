@@ -5,6 +5,17 @@ import { cardCandidatesSchema } from '@/lib/validators/api';
 import { log } from '@/lib/observability/log';
 import type { CardCandidate } from '@/lib/types/domain';
 
+/** gpt-4.1-mini token rates, USD per 1M tokens. */
+const COST_PER_1M_INPUT_USD = 0.4;
+const COST_PER_1M_OUTPUT_USD = 1.6;
+
+function estimateCostUsd(usage: { input_tokens?: number; output_tokens?: number } | undefined) {
+  if (!usage) return undefined;
+  const inTokens = usage.input_tokens ?? 0;
+  const outTokens = usage.output_tokens ?? 0;
+  return (inTokens * COST_PER_1M_INPUT_USD + outTokens * COST_PER_1M_OUTPUT_USD) / 1_000_000;
+}
+
 export async function generateCardCandidates(input: {
   learningTargetTitle: string;
   category: string;
@@ -36,9 +47,9 @@ export async function generateCardCandidates(input: {
       stage: 'card_generation',
       model,
       latencyMs: Date.now() - startedAt,
-      attemptCount: 1,
       promptTokens: response.usage?.input_tokens,
       completionTokens: response.usage?.output_tokens,
+      estimatedCostUsd: estimateCostUsd(response.usage),
     });
 
     const rawText = response.output_text;
@@ -50,7 +61,6 @@ export async function generateCardCandidates(input: {
       stage: 'card_generation',
       model,
       latencyMs: Date.now() - startedAt,
-      attemptCount: 1,
       errorName: err?.constructor?.name,
       message: err?.message,
     });
