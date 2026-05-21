@@ -655,7 +655,39 @@ export type Database = {
       }
     }
     Views: {
-      [_ in never]: never
+      jobs_dead_letter: {
+        Row: {
+          attempts: number | null
+          created_at: string | null
+          id: string | null
+          last_error: string | null
+          max_attempts: number | null
+          payload: Json | null
+          type: string | null
+          updated_at: string | null
+        }
+        Insert: {
+          attempts?: number | null
+          created_at?: string | null
+          id?: string | null
+          last_error?: string | null
+          max_attempts?: number | null
+          payload?: Json | null
+          type?: string | null
+          updated_at?: string | null
+        }
+        Update: {
+          attempts?: number | null
+          created_at?: string | null
+          id?: string | null
+          last_error?: string | null
+          max_attempts?: number | null
+          payload?: Json | null
+          type?: string | null
+          updated_at?: string | null
+        }
+        Relationships: []
+      }
     }
     Functions: {
       check_and_consume_rate_limit: {
