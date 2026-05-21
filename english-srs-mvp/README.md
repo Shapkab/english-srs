@@ -69,6 +69,28 @@ The entire schema lives in `supabase/migrations/20260510000000_init.sql`. Future
 
 Row-Level Security is **enabled and forced** on every user-scoped table (and `jobs` is locked down to the service role). Routes use the user-scoped Supabase client and rely on `auth.uid()` policies; the worker uses the service-role key to bypass RLS for cross-user infrastructure tasks. Direct `psql` reads against a tenant's tables without `auth.uid()` set will return zero rows even as the table owner — that's intentional, not a bug.
 
+## Deployment (Vercel)
+
+The app is deployed on Vercel. Because the Next.js app lives in the
+`english-srs-mvp/` subdirectory of the repo, the Vercel project's
+**Root Directory must be set to `english-srs-mvp`** — otherwise every
+build fails. `vercel.json` pins the framework preset; everything else is
+Next.js zero-config.
+
+- **Environment variables** are configured in Vercel project settings
+  (Production + Preview scopes), not committed. They must point at a
+  **hosted** Supabase project — the local stack (`127.0.0.1`) is not
+  reachable from Vercel. See **Environment variables** above for the
+  list. Do **not** set `ENABLE_DEV_AUTH` in Vercel: `NODE_ENV` is
+  `production` there, so real auth is always used.
+- **Previews:** every branch / PR gets its own preview URL; `main`
+  deploys to production.
+- **Worker caveat:** the async analysis worker (`npm run worker:dev`,
+  `workers/process-jobs.ts`) is a long-running poller and is **not** run
+  by Vercel (serverless only). On a Vercel-only deploy, submissions are
+  created and queued but never analyzed until the worker runs somewhere
+  with access to the same hosted Supabase.
+
 ## Suggested build order
 
 ### Phase 1
