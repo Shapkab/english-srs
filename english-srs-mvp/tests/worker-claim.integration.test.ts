@@ -228,7 +228,9 @@ suite('worker retry-with-backoff and terminal failure (H2, H3)', () => {
         throw err;
       })
       .mockImplementationOnce(async () => {
-        // success path: worker only cares that no error was thrown.
+        // success path: return the real ProcessSubmissionResult shape the
+        // worker logs (issueCount / createdCardIds).
+        return { issueCount: 0, createdCardIds: [] };
       });
 
     const worked1 = await isolateAndProcess(jobId);
