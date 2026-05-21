@@ -92,6 +92,18 @@ export async function processOneJob(supabase: SupabaseClient<Database>): Promise
       .update({ status: 'failed', last_error: 'max_attempts_exceeded' })
       .eq('id', nextJob.id);
     if (failErr) throw failErr;
+
+    // Propagate the failure to the submission (M5) — otherwise it stalls
+    // in `pending` forever. Mirrors the terminal catch-branch below.
+    const payload = nextJob.payload as { submissionId?: string; userId?: string };
+    if (payload?.submissionId && payload?.userId) {
+      const { error: markErr } = await supabase.rpc('mark_submission_failed', {
+        p_submission_id: payload.submissionId,
+        p_user_id: payload.userId,
+        p_reason: 'max_attempts_exceeded',
+      });
+      if (markErr) console.error('[worker] mark_submission_failed error', markErr);
+    }
     return true;
   }
 
