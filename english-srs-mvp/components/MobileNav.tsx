@@ -3,7 +3,7 @@
 import Link from 'next/link';
 import type { Route } from 'next';
 import { usePathname } from 'next/navigation';
-import { Calendar, Crosshair, Layers, Menu, X } from 'lucide-react';
+import { Calendar, Crosshair, Layers, Menu, X, SquarePen, Zap } from 'lucide-react';
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { cn } from '@/lib/ui/cn';
 
@@ -84,6 +84,11 @@ export function MobileNav({ dueCount = null, targetCount = null }: MobileNavProp
     { href: '/targets' as Route, label: 'Learning targets', Icon: Crosshair, count: targetCount },
   ];
 
+  const captureItems: NavItem[] = [
+    { href: '/submit' as Route, label: 'Submit text', Icon: SquarePen, count: null },
+    { href: '/quick' as Route, label: 'Quick capture', Icon: Zap, count: null },
+  ];
+
   return (
     <>
       <header className="md:hidden sticky top-0 z-30 flex items-center justify-between border-b border-line bg-bg-elev px-4 py-3">
@@ -159,6 +164,23 @@ export function MobileNav({ dueCount = null, targetCount = null }: MobileNavProp
                     {it.count}
                   </span>
                 )}
+              </Link>
+            );
+          })}
+          <div className="label-tiny px-2 mb-1.5 mt-4">Capture</div>
+          {captureItems.map((it) => {
+            const active = pathname === it.href || pathname.startsWith(it.href + '/');
+            return (
+              <Link
+                key={it.label}
+                href={it.href}
+                className={cn(
+                  'flex items-center gap-2.5 rounded-lg px-3 py-2.5 text-[14px] transition-colors',
+                  active ? 'bg-ink text-bg-elev' : 'text-ink-soft hover:bg-bg-sunken hover:text-ink',
+                )}
+              >
+                <it.Icon size={16} strokeWidth={1.7} />
+                <span className="flex-1">{it.label}</span>
               </Link>
             );
           })}

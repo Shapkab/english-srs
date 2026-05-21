@@ -4,7 +4,7 @@ import Link from 'next/link';
 import type { Route } from 'next';
 import { usePathname, useRouter } from 'next/navigation';
 import { useState } from 'react';
-import { Calendar, Layers, Crosshair, Inbox, LogOut } from 'lucide-react';
+import { Calendar, Layers, Crosshair, Inbox, LogOut, SquarePen, Zap } from 'lucide-react';
 import { cn } from '@/lib/ui/cn';
 import { getBrowserSupabase } from '@/lib/supabase/browser';
 
@@ -45,6 +45,11 @@ export function Sidebar({ dueCount = null, targetCount = null, streak }: Sidebar
     { href: '/submissions' as Route, label: 'Submissions', Icon: Inbox, count: null },
   ];
 
+  const capture: NavItem[] = [
+    { href: '/submit' as Route, label: 'Submit text', Icon: SquarePen, count: null },
+    { href: '/quick' as Route, label: 'Quick capture', Icon: Zap, count: null },
+  ];
+
   return (
     <aside className="hidden md:flex w-[240px] shrink-0 flex-col gap-7 border-r border-line bg-bg-elev px-5 py-7 sticky top-0 h-screen">
       <div className="flex items-center gap-2.5 px-2">
@@ -57,6 +62,8 @@ export function Sidebar({ dueCount = null, targetCount = null, streak }: Sidebar
       </div>
 
       <NavGroup title="Practice" items={practice} pathname={pathname} />
+
+      <NavGroup title="Capture" items={capture} pathname={pathname} />
 
       <div className="mt-auto flex flex-col gap-3">
         {streak && streak.length > 0 && (
