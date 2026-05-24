@@ -66,6 +66,15 @@ npm run dev
 
 The entire schema lives in `supabase/migrations/20260510000000_init.sql`. Future schema changes go in new `supabase/migrations/<YYYYMMDDHHMMSS>_<name>.sql` files; each migration must be plain SQL (no `\i` includes) and idempotent (`if not exists` / `create or replace` / `drop ... if exists`).
 
+### Type generation
+
+After applying a migration, regenerate `lib/types/database.generated.ts`:
+
+- `npm run db:types` — runs against the **local** Supabase stack (default for development).
+- `npm run db:types:remote` — runs against the **linked hosted** project (after `npx supabase link`).
+
+Use `db:types` against the local stack and `db:types:remote` after `npx supabase link` against a hosted project.
+
 ## Environment variables
 
 `.env.example` is the source of truth. Each key:
