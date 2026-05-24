@@ -1,0 +1,4 @@
+.next
+node_modules
+lib/types/database.generated.ts
+package-lock.json
