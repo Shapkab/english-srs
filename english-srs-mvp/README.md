@@ -54,6 +54,8 @@ npm run dev
 > In a second terminal, run `npm run worker:dev` — submissions stay in
 > `'pending'` forever until the worker is running.
 
+> `OPENAI_API_KEY` is only required when running the worker; UI-only exploration works without it.
+
 The entire schema lives in `supabase/migrations/20260510000000_init.sql`. Future schema changes go in new `supabase/migrations/<YYYYMMDDHHMMSS>_<name>.sql` files; each migration must be plain SQL (no `\i` includes) and idempotent (`if not exists` / `create or replace` / `drop ... if exists`).
 
 ## Environment variables
