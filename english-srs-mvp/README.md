@@ -113,6 +113,13 @@ Next.js zero-config.
   created and queued but never analyzed until the worker runs somewhere
   with access to the same hosted Supabase.
 
+### Pre-deploy checks
+
+Before applying any migration that introduces a unique constraint, run
+[`scripts/verify-prod-constraints.sql`](scripts/verify-prod-constraints.sql)
+against the target database to identify rows that would violate the new
+constraint. Resolve them in data before applying the migration.
+
 ## Suggested build order
 
 ### Phase 1
