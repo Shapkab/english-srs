@@ -23,20 +23,28 @@ Submission
 ## Included
 
 - Next.js app router skeleton
-- API endpoints for submissions, analysis, review queue, reviews, and card feedback
+- Authentication UI (signup, login, session management)
+- Dashboard UI (AppShell, Sidebar, Topbar, library, capture flows)
+- API endpoints for submissions, analysis, review queue, reviews,
+  card feedback, drafts, stats, and learning-target detail
 - Zod schemas for request/response validation
 - OpenAI structured output prompts and service layer
 - Supabase SQL schema and RLS-friendly table layout
-- SRS update logic (SM-2 style)
-- Worker scaffold for async analysis
-- Normalization layer scaffold for converting issues into learning targets
+- SRS update logic (SM-2 style) with leech auto-suspend
+- Worker scaffold for async analysis (Supabase webhook trigger on
+  production; polling fallback retained in `workers/process-jobs.ts`)
+- Normalization layer for converting issues into learning targets
+- PWA with offline submission queue
+- Per-user daily and hourly rate limits
+- Baseline security headers
+- Structured logger with request IDs
+- `jobs_dead_letter` view for failed-job triage
+- CI pipeline (lint / typecheck / test)
 
 ## Not included yet
 
-- Authentication UI
 - Voice input
 - Chat tutor mode
-- Admin dashboard
 - Native mobile client
 
 ## Quick start
