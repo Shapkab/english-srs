@@ -19,7 +19,14 @@ jobs:
           node-version: 22
           cache: npm
           cache-dependency-path: english-srs-mvp/package-lock.json
+      - uses: actions/cache@v4
+        with:
+          path: english-srs-mvp/.next/cache
+          key: nextcache-${{ hashFiles('english-srs-mvp/package-lock.json') }}-${{ hashFiles('english-srs-mvp/**/*.[jt]s', 'english-srs-mvp/**/*.[jt]sx') }}
+          restore-keys: |
+            nextcache-${{ hashFiles('english-srs-mvp/package-lock.json') }}-
       - run: npm ci
       - run: npm run lint
       - run: npm run typecheck
+      - run: npm run build
       - run: npm test
