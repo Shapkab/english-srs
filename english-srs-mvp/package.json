@@ -19,7 +19,8 @@
     "format": "prettier --write .",
     "format:check": "prettier --check .",
     "worker:dev": "tsx watch workers/process-jobs.ts",
-    "dev:all": "concurrently -n web,worker -c blue,magenta \"npm run dev\" \"npm run worker:dev\""
+    "dev:all": "concurrently -n web,worker -c blue,magenta \"npm run dev\" \"npm run worker:dev\"",
+    "prepare": "husky"
   },
   "dependencies": {
     "@supabase/supabase-js": "^2.49.8",
@@ -39,6 +40,7 @@
     "eslint": "^9.22.0",
     "eslint-config-next": "^15.2.4",
     "eslint-config-prettier": "10.1.8",
+    "husky": "9.1.7",
     "postcss": "^8.5.14",
     "prettier": "3.8.3",
     "tailwindcss": "^3.4.19",
