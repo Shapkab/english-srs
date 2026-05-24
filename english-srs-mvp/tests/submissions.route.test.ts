@@ -64,7 +64,7 @@ suite('POST /api/v1/submissions', () => {
     }
   });
 
-  it('returns 201 and inserts an analyze_submission row in jobs', async () => {
+  it('returns 201 with a submissionId for a valid request', async () => {
     const request = new Request('http://localhost/api/v1/submissions', {
       method: 'POST',
       headers: {
@@ -80,19 +80,6 @@ suite('POST /api/v1/submissions', () => {
     const json = (await response.json()) as { submissionId: string; status: string };
     expect(json.submissionId).toMatch(/^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i);
 
-    const { data: jobs, error: jobsError } = await admin
-      .from('jobs')
-      .select('id, type, status, payload')
-      .eq('payload->>submissionId', json.submissionId);
-
-    expect(jobsError).toBeNull();
-    expect(jobs ?? []).toHaveLength(1);
-    expect(jobs![0].type).toBe('analyze_submission');
-    expect(jobs![0].status).toBe('pending');
-
-    if (jobs?.[0]?.id) {
-      await admin.from('jobs').delete().eq('id', jobs[0].id);
-    }
     await admin.from('submissions').delete().eq('id', json.submissionId);
   });
 

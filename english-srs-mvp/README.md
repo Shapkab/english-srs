@@ -154,6 +154,16 @@ curl -X POST http://localhost:3000/api/dev/process-submission/<submissionId> \
 
 ## Worker operations
 
+> **As of this PR**, submission analysis is triggered by a
+> **Supabase Database Webhook → Vercel function** pipeline
+> (`app/api/internal/webhooks/supabase-submission`). The
+> `workers/process-jobs.ts` polling worker is retained in the
+> repository for now but is not deployed and is not on the
+> production path. The `jobs` table receives no new rows from the
+> application. A follow-up task will remove the worker, the
+> `jobs` table, and the `jobs_dead_letter` view once the webhook
+> path has been observed stable in production.
+
 - **Throughput ceiling.** `workers/process-jobs.ts` claims **one** job per
   poll cycle and each job is two-or-more serial OpenAI calls (~5–30 s).
   Realistic ceiling is a few jobs/min per worker process.
@@ -164,3 +174,35 @@ curl -X POST http://localhost:3000/api/dev/process-submission/<submissionId> \
   are surfaced by the `jobs_dead_letter` view — the human-recovery surface
   for inspecting `last_error` and deciding whether to requeue or discard.
   Like `jobs`, it is service-role / admin only.
+
+### Submission webhook
+
+- **Where it's configured.** Supabase dashboard → Database → Webhooks →
+  `process_submission_on_insert`. The webhook fires on a single trigger:
+  `INSERT` on `public.submissions`.
+- **Auth.** Each request carries
+  `Authorization: Bearer $SUPABASE_WEBHOOK_SECRET`. The Vercel route
+  fails closed with `500 webhook_secret_unset` if the env var is missing
+  and `401 unauthorized` if the header does not match (compared with
+  `timingSafeEqual`).
+- **`after()` design.** The route validates the payload, returns
+  `200 { accepted: true }` immediately, and then runs the analysis in a
+  Vercel background task via Next.js's `after()` API. The function stays
+  alive up to `maxDuration` (60 s on Hobby, 300 s on Pro), which is the
+  ceiling for any single submission's processing.
+- **Why no retry.** Supabase's webhook timeout (~5 s) is shorter than
+  OpenAI analysis latency (5–30 s), so any synchronous retry by Supabase
+  would race the disconnect and be unreliable. The OpenAI SDK retries
+  retryable errors twice internally before they surface to the route, so
+  most transient failures are already absorbed.
+- **Idempotency.** The route short-circuits with
+  `200 { skipped: 'non_pending_status' }` if the inserted row's `status`
+  is already non-`pending`. Downstream, `persist_submission_analysis`
+  early-returns if an `analyses` row already exists for the submission,
+  so even a duplicate fire is harmless.
+- **Secret rotation.** The webhook secret lives in **two** places that
+  must be updated in lockstep: the `SUPABASE_WEBHOOK_SECRET` env var on
+  Vercel (Production scope) and the `Authorization` header value on the
+  Supabase webhook configuration. Update Vercel first, then Supabase,
+  and re-deploy if needed so both sides are in sync before any new
+  submission is created.

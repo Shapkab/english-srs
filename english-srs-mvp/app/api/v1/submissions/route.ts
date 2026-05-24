@@ -93,15 +93,6 @@ export async function POST(request: Request) {
 
     if (error || !submission) throw error ?? new Error('Failed to create submission');
 
-    const { error: jobInsertError } = await admin
-      .from('jobs')
-      .insert({
-        type: 'analyze_submission',
-        payload: { submissionId: submission.id, userId },
-        status: 'pending',
-      });
-    if (jobInsertError) throw jobInsertError;
-
     trackEvent('submission_created', { userId, submissionId: submission.id });
 
     return NextResponse.json({ submissionId: submission.id, status: submission.status }, { status: 201 });
