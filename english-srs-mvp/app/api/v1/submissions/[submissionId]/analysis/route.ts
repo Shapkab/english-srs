@@ -1,9 +1,9 @@
-import { NextResponse } from 'next/server';
 import { requireUserContext } from '@/lib/auth/user';
 import { uuidParam } from '@/lib/validators/path-params';
 import { HttpError, toErrorResponse } from '@/lib/http/errors';
 import { masteryLevelsByLearningTarget } from '@/lib/srs/mastery';
 import { computeLinkKind } from '@/lib/ui/link-kind';
+import { jsonWithRequestId, withRequestId } from '@/lib/observability/log';
 
 /** Map an internal failure to a user-safe message. The raw failure_reason
  *  can carry OpenAI/SDK internals, so it must never reach the client (L1).
@@ -13,6 +13,7 @@ function safeFailureReason(status: string): string | null {
 }
 
 export async function GET(request: Request, context: { params: Promise<{ submissionId: string }> }) {
+  const { requestId } = withRequestId(request);
   try {
     const { userId, supabase } = await requireUserContext(request);
     const { submissionId: rawSubmissionId } = await context.params;
@@ -100,54 +101,57 @@ export async function GET(request: Request, context: { params: Promise<{ submiss
 
     const submissionCreatedAt = submission.created_at;
 
-    return NextResponse.json({
-      status: submission.status,
-      failureReason: safeFailureReason(submission.status),
-      originalText: submission.original_text,
-      createdAt: submission.created_at,
-      correctedText: analysis?.corrected_text ?? null,
-      summary: analysis?.summary ?? null,
-      issues: (issues ?? []).map((issue) => {
-        const ev = evidenceByIssue[issue.id];
-        const lt = ev ? ltById[ev.ltId] : null;
-        const mergedOccurrences = lt && lt.seenCount > 1 ? lt.seenCount : null;
-        const linkKind = computeLinkKind(
-          lt ? { firstSeenAt: lt.firstSeenAt, submissionCreatedAt, seenCount: lt.seenCount } : null,
-        );
-        return {
-          id: issue.id,
-          category: issue.category,
-          subcategory: issue.subcategory,
-          errorText: issue.error_text,
-          correctedText: issue.corrected_text,
-          explanationShort: issue.explanation_short,
-          confidence: issue.confidence,
-          severity: issue.severity,
-          shouldCreateCard: issue.should_create_card,
-          learningTarget: lt
-            ? {
-                id: lt.id,
-                title: lt.title,
-                category: lt.category,
-                masteryLevel: lt.masteryLevel,
-                seenCount: lt.seenCount,
-                linkKind,
-                mergedOccurrences,
-              }
-            : null,
-        };
-      }),
-      cardsCreated: (cards ?? []).map((c) => ({
-        id: c.id,
-        front: c.front,
-        back: c.back,
-        hint: c.hint,
-        cardType: c.card_type,
-        status: c.status,
-        learningTargetId: c.learning_target_id,
-        learningTarget: c.learning_target_id ? ltById[c.learning_target_id] ?? null : null,
-      })),
-    });
+    return jsonWithRequestId(
+      {
+        status: submission.status,
+        failureReason: safeFailureReason(submission.status),
+        originalText: submission.original_text,
+        createdAt: submission.created_at,
+        correctedText: analysis?.corrected_text ?? null,
+        summary: analysis?.summary ?? null,
+        issues: (issues ?? []).map((issue) => {
+          const ev = evidenceByIssue[issue.id];
+          const lt = ev ? ltById[ev.ltId] : null;
+          const mergedOccurrences = lt && lt.seenCount > 1 ? lt.seenCount : null;
+          const linkKind = computeLinkKind(
+            lt ? { firstSeenAt: lt.firstSeenAt, submissionCreatedAt, seenCount: lt.seenCount } : null,
+          );
+          return {
+            id: issue.id,
+            category: issue.category,
+            subcategory: issue.subcategory,
+            errorText: issue.error_text,
+            correctedText: issue.corrected_text,
+            explanationShort: issue.explanation_short,
+            confidence: issue.confidence,
+            severity: issue.severity,
+            shouldCreateCard: issue.should_create_card,
+            learningTarget: lt
+              ? {
+                  id: lt.id,
+                  title: lt.title,
+                  category: lt.category,
+                  masteryLevel: lt.masteryLevel,
+                  seenCount: lt.seenCount,
+                  linkKind,
+                  mergedOccurrences,
+                }
+              : null,
+          };
+        }),
+        cardsCreated: (cards ?? []).map((c) => ({
+          id: c.id,
+          front: c.front,
+          back: c.back,
+          hint: c.hint,
+          cardType: c.card_type,
+          status: c.status,
+          learningTargetId: c.learning_target_id,
+          learningTarget: c.learning_target_id ? ltById[c.learning_target_id] ?? null : null,
+        })),
+      },
+      { requestId },
+    );
   } catch (error) {
     return toErrorResponse(error, request);
   }

@@ -4,6 +4,7 @@ import { requireUserContext } from '@/lib/auth/user';
 import { getSupabaseAdmin } from '@/lib/db/server';
 import { trackEvent } from '@/lib/analytics/events';
 import { toErrorResponse } from '@/lib/http/errors';
+import { jsonWithRequestId, withRequestId } from '@/lib/observability/log';
 
 /** Maximum submissions per user per hour. Balances active practice
  *  against cost (each submission triggers AI analysis at ~$0.01-0.05). */
@@ -13,6 +14,7 @@ const RATE_LIMIT_SUBMISSIONS_PER_HOUR = 30;
 const RATE_LIMIT_SUBMISSIONS_PER_DAY = 100;
 
 export async function POST(request: Request) {
+  const { requestId } = withRequestId(request);
   try {
     const { userId, supabase } = await requireUserContext(request);
     const body = createSubmissionSchema.parse(await request.json());
@@ -95,13 +97,17 @@ export async function POST(request: Request) {
 
     trackEvent('submission_created', { userId, submissionId: submission.id });
 
-    return NextResponse.json({ submissionId: submission.id, status: submission.status }, { status: 201 });
+    return jsonWithRequestId(
+      { submissionId: submission.id, status: submission.status },
+      { status: 201, requestId },
+    );
   } catch (error) {
     return toErrorResponse(error, request);
   }
 }
 
 export async function GET(request: Request) {
+  const { requestId } = withRequestId(request);
   try {
     const { userId, supabase } = await requireUserContext(request);
 
@@ -114,7 +120,7 @@ export async function GET(request: Request) {
 
     if (error) throw error;
 
-    return NextResponse.json({ submissions: data ?? [] });
+    return jsonWithRequestId({ submissions: data ?? [] }, { requestId });
   } catch (error) {
     return toErrorResponse(error, request);
   }

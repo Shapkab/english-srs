@@ -1,8 +1,8 @@
-import { NextResponse } from 'next/server';
 import { z } from 'zod';
 import { requireUserContext } from '@/lib/auth/user';
 import { toErrorResponse } from '@/lib/http/errors';
 import { masteryLevelsByLearningTarget } from '@/lib/srs/mastery';
+import { jsonWithRequestId, withRequestId } from '@/lib/observability/log';
 
 const relatedLearningTargetSchema = z.object({
   id: z.string().uuid(),
@@ -31,6 +31,7 @@ const reviewQueueRowSchema = z.object({
 });
 
 export async function GET(request: Request) {
+  const { requestId } = withRequestId(request);
   try {
     const { userId, supabase } = await requireUserContext(request);
     const url = new URL(request.url);
@@ -47,7 +48,7 @@ export async function GET(request: Request) {
         .eq('cards.status', 'active')
         .lte('due_at', now);
       if (countErr) throw countErr;
-      return NextResponse.json({ total: count ?? 0 });
+      return jsonWithRequestId({ total: count ?? 0 }, { requestId });
     }
 
     const { data, error } = await supabase
@@ -108,7 +109,7 @@ export async function GET(request: Request) {
           : null,
       }));
 
-    return NextResponse.json({ cards });
+    return jsonWithRequestId({ cards }, { requestId });
   } catch (error) {
     return toErrorResponse(error, request);
   }

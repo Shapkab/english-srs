@@ -1,6 +1,6 @@
-import { NextResponse } from 'next/server';
 import { requireUserContext } from '@/lib/auth/user';
 import { toErrorResponse } from '@/lib/http/errors';
+import { jsonWithRequestId, withRequestId } from '@/lib/observability/log';
 
 const DAY_MS = 24 * 60 * 60 * 1000;
 
@@ -13,6 +13,7 @@ function startOfPrevMonth(d: Date): Date {
 }
 
 export async function GET(request: Request) {
+  const { requestId } = withRequestId(request);
   try {
     const { userId, supabase } = await requireUserContext(request);
     const now = new Date();
@@ -132,16 +133,19 @@ export async function GET(request: Request) {
       else cardBreakdown.review += 1;
     }
 
-    return NextResponse.json({
-      activeTargets,
-      activeTargetsDeltaWeek,
-      masteredThisMonth,
-      masteredDeltaPct,
-      retention30d,
-      retentionDelta,
-      streak,
-      cardBreakdown,
-    });
+    return jsonWithRequestId(
+      {
+        activeTargets,
+        activeTargetsDeltaWeek,
+        masteredThisMonth,
+        masteredDeltaPct,
+        retention30d,
+        retentionDelta,
+        streak,
+        cardBreakdown,
+      },
+      { requestId },
+    );
   } catch (error) {
     return toErrorResponse(error, request);
   }

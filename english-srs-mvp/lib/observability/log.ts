@@ -1,5 +1,7 @@
 /* eslint-disable no-console */
 
+import { NextResponse } from 'next/server';
+
 type Fields = Record<string, unknown>;
 
 function emit(level: 'error' | 'warn' | 'info' | 'debug', event: string, fields: Fields) {
@@ -20,4 +22,17 @@ export function withRequestId(request: Request): { requestId: string } {
   return {
     requestId: headerVal && headerVal.length > 0 ? headerVal : crypto.randomUUID(),
   };
+}
+
+/** JSON response helper that stamps `X-Request-Id` on every success
+ *  response, mirroring what `toErrorResponse` does for failures.
+ *  Preserves any caller-provided headers in `init.headers`. */
+export function jsonWithRequestId(
+  payload: unknown,
+  init: ResponseInit & { requestId: string },
+): Response {
+  const { requestId, headers, ...rest } = init;
+  const merged = new Headers(headers);
+  merged.set('X-Request-Id', requestId);
+  return NextResponse.json(payload, { ...rest, headers: merged });
 }
