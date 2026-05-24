@@ -1,12 +1,13 @@
-import { NextResponse } from 'next/server';
 import { requireUserContext } from '@/lib/auth/user';
 import { uuidParam } from '@/lib/validators/path-params';
 import { HttpError, toErrorResponse } from '@/lib/http/errors';
+import { jsonWithRequestId, withRequestId } from '@/lib/observability/log';
 
 export async function GET(
   request: Request,
   context: { params: Promise<{ id: string }> },
 ) {
+  const { requestId } = withRequestId(request);
   try {
     const { userId, supabase } = await requireUserContext(request);
     const { id: rawId } = await context.params;
@@ -42,47 +43,50 @@ export async function GET(
       .limit(50);
     if (eErr) throw eErr;
 
-    return NextResponse.json({
-      target: {
-        id: target.id,
-        canonicalKey: target.canonical_key,
-        displayTitle: target.display_title,
-        category: target.category,
-        subcategory: target.subcategory,
-        explanationShort: target.explanation_short,
-        seenCount: target.seen_count,
-        lastSeenAt: target.last_seen_at,
-        status: target.status,
-        mergedIntoId: target.merged_into_id,
+    return jsonWithRequestId(
+      {
+        target: {
+          id: target.id,
+          canonicalKey: target.canonical_key,
+          displayTitle: target.display_title,
+          category: target.category,
+          subcategory: target.subcategory,
+          explanationShort: target.explanation_short,
+          seenCount: target.seen_count,
+          lastSeenAt: target.last_seen_at,
+          status: target.status,
+          mergedIntoId: target.merged_into_id,
+        },
+        cards: (cards ?? []).map((c) => {
+          const srs = Array.isArray(c.srs_state) ? c.srs_state[0] ?? null : c.srs_state;
+          return {
+            cardId: c.id,
+            cardType: c.card_type,
+            front: c.front,
+            back: c.back,
+            hint: c.hint,
+            status: c.status,
+            priority: c.priority,
+            createdAt: c.created_at,
+            srs: srs && {
+              repetition: srs.repetition,
+              intervalDays: srs.interval_days,
+              easeFactor: srs.ease_factor,
+              dueAt: srs.due_at,
+              lapseCount: srs.lapse_count,
+              lastReviewedAt: srs.last_reviewed_at,
+            },
+          };
+        }),
+        evidence: (evidence ?? []).map((e) => ({
+          id: e.id,
+          analysisIssueId: e.analysis_issue_id,
+          submissionId: e.submission_id,
+          createdAt: e.created_at,
+        })),
       },
-      cards: (cards ?? []).map((c) => {
-        const srs = Array.isArray(c.srs_state) ? c.srs_state[0] ?? null : c.srs_state;
-        return {
-          cardId: c.id,
-          cardType: c.card_type,
-          front: c.front,
-          back: c.back,
-          hint: c.hint,
-          status: c.status,
-          priority: c.priority,
-          createdAt: c.created_at,
-          srs: srs && {
-            repetition: srs.repetition,
-            intervalDays: srs.interval_days,
-            easeFactor: srs.ease_factor,
-            dueAt: srs.due_at,
-            lapseCount: srs.lapse_count,
-            lastReviewedAt: srs.last_reviewed_at,
-          },
-        };
-      }),
-      evidence: (evidence ?? []).map((e) => ({
-        id: e.id,
-        analysisIssueId: e.analysis_issue_id,
-        submissionId: e.submission_id,
-        createdAt: e.created_at,
-      })),
-    });
+      { requestId },
+    );
   } catch (error) {
     return toErrorResponse(error, request);
   }

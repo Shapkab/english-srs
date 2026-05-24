@@ -1,10 +1,11 @@
-import { NextResponse } from 'next/server';
 import { reviewSchema } from '@/lib/validators/api';
 import { requireUserContext } from '@/lib/auth/user';
 import { toErrorResponse } from '@/lib/http/errors';
 import { getSupabaseAdmin } from '@/lib/db/server';
+import { jsonWithRequestId, withRequestId } from '@/lib/observability/log';
 
 export async function POST(request: Request) {
+  const { requestId } = withRequestId(request);
   try {
     const { userId, supabase } = await requireUserContext(request);
     const body = reviewSchema.parse(await request.json());
@@ -30,7 +31,7 @@ export async function POST(request: Request) {
     );
     if (rpcError) throw rpcError;
 
-    return NextResponse.json({ ok: true, nextDueAt });
+    return jsonWithRequestId({ ok: true, nextDueAt }, { requestId });
   } catch (error) {
     return toErrorResponse(error, request);
   }

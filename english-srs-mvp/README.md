@@ -23,20 +23,28 @@ Submission
 ## Included
 
 - Next.js app router skeleton
-- API endpoints for submissions, analysis, review queue, reviews, and card feedback
+- Authentication UI (signup, login, session management)
+- Dashboard UI (AppShell, Sidebar, Topbar, library, capture flows)
+- API endpoints for submissions, analysis, review queue, reviews,
+  card feedback, drafts, stats, and learning-target detail
 - Zod schemas for request/response validation
 - OpenAI structured output prompts and service layer
 - Supabase SQL schema and RLS-friendly table layout
-- SRS update logic (SM-2 style)
-- Worker scaffold for async analysis
-- Normalization layer scaffold for converting issues into learning targets
+- SRS update logic (SM-2 style) with leech auto-suspend
+- Worker scaffold for async analysis (Supabase webhook trigger on
+  production; polling fallback retained in `workers/process-jobs.ts`)
+- Normalization layer for converting issues into learning targets
+- PWA with offline submission queue
+- Per-user daily and hourly rate limits
+- Baseline security headers
+- Structured logger with request IDs
+- `jobs_dead_letter` view for failed-job triage
+- CI pipeline (lint / typecheck / test)
 
 ## Not included yet
 
-- Authentication UI
 - Voice input
 - Chat tutor mode
-- Admin dashboard
 - Native mobile client
 
 ## Quick start
@@ -51,7 +59,21 @@ npx supabase db reset --local
 npm run dev
 ```
 
+> In a second terminal, run `npm run worker:dev` — submissions stay in
+> `'pending'` forever until the worker is running.
+
+> `OPENAI_API_KEY` is only required when running the worker; UI-only exploration works without it.
+
 The entire schema lives in `supabase/migrations/20260510000000_init.sql`. Future schema changes go in new `supabase/migrations/<YYYYMMDDHHMMSS>_<name>.sql` files; each migration must be plain SQL (no `\i` includes) and idempotent (`if not exists` / `create or replace` / `drop ... if exists`).
+
+### Type generation
+
+After applying a migration, regenerate `lib/types/database.generated.ts`:
+
+- `npm run db:types` — runs against the **local** Supabase stack (default for development).
+- `npm run db:types:remote` — runs against the **linked hosted** project (after `npx supabase link`).
+
+Use `db:types` against the local stack and `db:types:remote` after `npx supabase link` against a hosted project.
 
 ## Environment variables
 
@@ -90,6 +112,13 @@ Next.js zero-config.
   by Vercel (serverless only). On a Vercel-only deploy, submissions are
   created and queued but never analyzed until the worker runs somewhere
   with access to the same hosted Supabase.
+
+### Pre-deploy checks
+
+Before applying any migration that introduces a unique constraint, run
+[`scripts/verify-prod-constraints.sql`](scripts/verify-prod-constraints.sql)
+against the target database to identify rows that would violate the new
+constraint. Resolve them in data before applying the migration.
 
 ## Suggested build order
 

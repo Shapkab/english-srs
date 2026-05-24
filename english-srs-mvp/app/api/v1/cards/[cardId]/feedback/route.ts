@@ -1,10 +1,11 @@
-import { NextResponse } from 'next/server';
 import { feedbackSchema } from '@/lib/validators/api';
 import { uuidParam } from '@/lib/validators/path-params';
 import { requireUserContext } from '@/lib/auth/user';
 import { toErrorResponse } from '@/lib/http/errors';
+import { jsonWithRequestId, withRequestId } from '@/lib/observability/log';
 
 export async function POST(request: Request, context: { params: Promise<{ cardId: string }> }) {
+  const { requestId } = withRequestId(request);
   try {
     const { userId, supabase } = await requireUserContext(request);
     const { cardId: rawCardId } = await context.params;
@@ -28,7 +29,7 @@ export async function POST(request: Request, context: { params: Promise<{ cardId
       if (suspendError) throw suspendError;
     }
 
-    return NextResponse.json({ ok: true });
+    return jsonWithRequestId({ ok: true }, { requestId });
   } catch (error) {
     return toErrorResponse(error, request);
   }

@@ -3,6 +3,9 @@ on:
   push:
     branches: [main]
   pull_request:
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: true
 jobs:
   check:
     runs-on: ubuntu-latest
@@ -16,7 +19,17 @@ jobs:
           node-version: 22
           cache: npm
           cache-dependency-path: english-srs-mvp/package-lock.json
+      - uses: actions/cache@v4
+        with:
+          path: english-srs-mvp/.next/cache
+          key: nextcache-${{ hashFiles('english-srs-mvp/package-lock.json') }}-${{ hashFiles('english-srs-mvp/**/*.[jt]s', 'english-srs-mvp/**/*.[jt]sx') }}
+          restore-keys: |
+            nextcache-${{ hashFiles('english-srs-mvp/package-lock.json') }}-
       - run: npm ci
       - run: npm run lint
       - run: npm run typecheck
+      - run: npm run build
+      - name: npm audit (advisory)
+        run: npm audit --audit-level=high
+        continue-on-error: true
       - run: npm test

@@ -4,6 +4,7 @@ import { pathToFileURL } from 'node:url';
 import { getSupabaseAdmin } from '@/lib/db/server';
 import { processSubmission } from '@/lib/services/process-submission.service';
 import type { Database } from '@/lib/types/database.generated';
+import { log } from '@/lib/observability/log';
 
 /** Time after which a "processing" job is considered abandoned and can be reclaimed.
  *  5 minutes balances recovery speed vs false positives on slow OpenAI calls. */
@@ -73,7 +74,7 @@ export async function recoverStaleClaims(
 
 export async function processOneJob(supabase: SupabaseClient<Database>): Promise<boolean> {
   const recovered = await recoverStaleClaims(supabase);
-  if (recovered > 0) console.log(`[worker] recovered ${recovered} stale jobs`);
+  if (recovered > 0) log.warn('worker_stale_claim_recovered', { count: recovered });
 
   const { data: nextJob, error: nextErr } = await supabase
     .from('jobs')

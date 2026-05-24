@@ -1,3 +1,33 @@
 {
-  "extends": "next/core-web-vitals"
+  "extends": ["next/core-web-vitals", "prettier"],
+  "rules": {
+    "no-restricted-imports": [
+      "error",
+      {
+        "patterns": [
+          {
+            "group": ["@/lib/db/server"],
+            "importNames": ["getSupabaseAdmin"],
+            "message": "Use getSupabaseUserClient unless this file is a worker or auth helper. See docs/CONVENTIONS.md (T2)."
+          }
+        ]
+      }
+    ]
+  },
+  "overrides": [
+    {
+      "files": [
+        "workers/**/*",
+        "lib/auth/user.ts",
+        "app/api/v1/submissions/route.ts",
+        "tests/**/*",
+        "app/api/v1/reviews/route.ts",
+        "app/api/internal/webhooks/supabase-submission/route.ts",
+        "lib/services/process-submission.service.ts"
+      ],
+      "rules": {
+        "no-restricted-imports": "off"
+      }
+    }
+  ]
 }

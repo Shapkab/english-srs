@@ -2,6 +2,9 @@
   "name": "english-srs-mvp",
   "version": "0.1.0",
   "private": true,
+  "engines": {
+    "node": ">=20.6"
+  },
   "scripts": {
     "dev": "next dev",
     "build": "next build",
@@ -10,8 +13,14 @@
     "typecheck": "next typegen && tsc --noEmit",
     "test": "vitest run",
     "test:unit": "vitest run unit.test",
+    "test:integration": "vitest run integration.test",
     "db:types": "npx supabase gen types typescript --local > lib/types/database.generated.ts",
-    "worker:dev": "tsx workers/process-jobs.ts"
+    "db:types:remote": "npx supabase gen types typescript --linked > lib/types/database.generated.ts",
+    "format": "prettier --write .",
+    "format:check": "prettier --check .",
+    "worker:dev": "tsx watch workers/process-jobs.ts",
+    "dev:all": "concurrently -n web,worker -c blue,magenta \"npm run dev\" \"npm run worker:dev\"",
+    "prepare": "husky"
   },
   "dependencies": {
     "@supabase/supabase-js": "^2.49.8",
@@ -27,9 +36,13 @@
     "@types/react": "^19.0.12",
     "@types/react-dom": "^19.0.4",
     "autoprefixer": "^10.5.0",
+    "concurrently": "9.2.1",
     "eslint": "^9.22.0",
     "eslint-config-next": "^15.2.4",
+    "eslint-config-prettier": "10.1.8",
+    "husky": "9.1.7",
     "postcss": "^8.5.14",
+    "prettier": "3.8.3",
     "tailwindcss": "^3.4.19",
     "tsx": "^4.19.3",
     "typescript": "^5.8.2",
