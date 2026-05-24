@@ -13,6 +13,7 @@
     "typecheck": "next typegen && tsc --noEmit",
     "test": "vitest run",
     "test:unit": "vitest run unit.test",
+    "test:integration": "vitest run integration.test",
     "db:types": "npx supabase gen types typescript --local > lib/types/database.generated.ts",
     "db:types:remote": "npx supabase gen types typescript --linked > lib/types/database.generated.ts",
     "format": "prettier --write .",
